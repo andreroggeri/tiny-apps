@@ -37,11 +37,9 @@ POMBO_DATA_DIR=./data PAPERLESS_URL=https://docs.example PAPERLESS_TOKEN=... go 
 
 ## Release
 
-```sh
-revision="$(git rev-parse --short=7 HEAD)"
-docker buildx build --platform linux/amd64,linux/arm64 --push \
-  -t "registry.local.roggeri.com.br/pombo:${revision}" .
-```
+Every push to `main` builds `ghcr.io/andreroggeri/pombo:sha-<commit>` (and
+`latest`) for amd64 and arm64 after the tests pass; a `vX.Y.Z` tag also
+publishes `X.Y.Z`. See `.github/workflows/release.yml`.
 
 Then set the tag in `k3s/applications/pombo/values.yaml` in the infrastructure
 repo and deploy with `helmfile -l name=pombo --skip-deps sync`.
