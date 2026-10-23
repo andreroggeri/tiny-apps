@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{{if not .Status.LoggedIn}}<meta http-equiv="refresh" content="15">{{end}}
+<title>pombo</title>
+<style>
+  :root { --bg:#f7f7f5; --card:#fff; --text:#1d1d1b; --muted:#6b6b66; --line:#e4e4df; --accent:#1f7a4d; --warn:#b4541a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#161615; --card:#1f1f1d; --text:#ececea; --muted:#9a9a94; --line:#33332f; --accent:#4cc287; --warn:#e8935a; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui, sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:22px; margin:0 0 20px; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:16px; margin-bottom:16px; }
+  .muted { color:var(--muted); }
+  .ok { color:var(--accent); font-weight:600; }
+  .warn { color:var(--warn); font-weight:600; }
+  table { width:100%; border-collapse:collapse; }
+  td { padding:8px 4px; border-top:1px solid var(--line); vertical-align:middle; }
+  tr:first-child td { border-top:0; }
+  form.inline { display:flex; gap:8px; align-items:center; margin:0; flex-wrap:wrap; }
+  input, select, button { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); }
+  button { cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .qr { background:#fff; padding:12px; border-radius:8px; display:inline-block; }
+  code { font-size:12px; color:var(--muted); word-break:break-all; }
+</style>
+</head>
+<body>
+<main>
+  <h1>🕊️ pombo</h1>
+
+  {{if .Error}}<section><span class="warn">{{.Error}}</span></section>{{end}}
+
+  <section>
+    <h2>WhatsApp</h2>
+    {{if .Status.LoggedIn}}
+      <p>{{if .Status.Connected}}<span class="ok">Conectado</span>{{else}}<span class="warn">Desconectado</span> (reconectando…){{end}}
+        como <strong>+{{.Status.Phone}}</strong></p>
+    {{else if .QRImage}}
+      <p>No celular do bot: <strong>WhatsApp → Aparelhos conectados → Conectar um aparelho</strong>, e escaneie:</p>
+      <div class="qr"><img src="{{.QRImage}}" width="320" height="320" alt="QR code para parear"></div>
+      <p class="muted">O código muda a cada ~20 s; a página atualiza sozinha.</p>
+    {{else}}
+      <p class="muted">Preparando o QR code…</p>
+    {{end}}
+  </section>
+
+  <section>
+    <h2>Grupos</h2>
+    {{if .Groups}}
+    <table>
+      {{range .Groups}}
+      <tr>
+        <td>
+          <strong>{{or .Name "(sem nome)"}}</strong>{{if not .Joined}} <span class="warn">(bot saiu do grupo)</span>{{end}}<br>
+          <code>{{.JID}}</code>
+        </td>
+        <td>
+          <form class="inline" method="post" action="/routes">
+            <input type="hidden" name="group_jid" value="{{.JID}}">
+            <input type="hidden" name="group_name" value="{{.Name}}">
+            <select name="handler" aria-label="Destino de {{.Name}}">
+              <option value="" {{if eq .Handler ""}}selected{{end}}>ignorar</option>
+              {{$current := .Handler}}
+              {{range $.Handlers}}<option value="{{.}}" {{if eq . $current}}selected{{end}}>{{.}}</option>{{end}}
+            </select>
+            <button type="submit">Salvar</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </table>
+    {{else}}
+      <p class="muted">Nenhum grupo ainda. Adicione o número do bot a um grupo e recarregue.</p>
+    {{end}}
+  </section>
+
+  <section>
+    <h2>Quem pode usar</h2>
+    <p class="muted">Mensagens de qualquer outro número são ignoradas, mesmo dentro dos grupos.</p>
+    {{if .Senders}}
+    <table>
+      {{range .Senders}}
+      <tr>
+        <td><strong>{{or .Name "—"}}</strong> <span class="muted">+{{.Phone}}</span></td>
+        <td style="text-align:right">
+          <form class="inline" method="post" action="/senders/delete" style="justify-content:flex-end">
+            <input type="hidden" name="phone" value="{{.Phone}}">
+            <button type="submit">Remover</button>
+          </form>
+        </td>
+      </tr>
+      {{end}}
+    </table>
+    {{end}}
+    <form class="inline" method="post" action="/senders" style="margin-top:12px">
+      <input name="name" placeholder="Nome" aria-label="Nome">
+      <input name="phone" placeholder="+55 11 99999-8888" aria-label="Telefone" required>
+      <button class="primary" type="submit">Adicionar</button>
+    </form>
+  </section>
+</main>
+</body>
+</html>
