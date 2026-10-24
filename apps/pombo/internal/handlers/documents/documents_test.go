@@ -20,8 +20,9 @@ import (
 )
 
 type upload struct {
-	name string
-	data []byte
+	name   string
+	data   []byte
+	fields map[int]string
 }
 
 type fakePaperless struct {
@@ -32,10 +33,10 @@ type fakePaperless struct {
 	uploadErr error
 }
 
-func (f *fakePaperless) Upload(_ context.Context, name string, data []byte) (string, error) {
+func (f *fakePaperless) Upload(_ context.Context, name string, data []byte, fields map[int]string) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.uploads = append(f.uploads, upload{name, data})
+	f.uploads = append(f.uploads, upload{name, data, fields})
 	return "task", f.uploadErr
 }
 
@@ -90,7 +91,7 @@ type chat struct {
 
 func (c *chat) msg(id, text string, media *router.Media) router.Message {
 	return router.Message{
-		ChatJID: "docs@g.us", SenderPhone: "5511999998888", Text: text, Media: media,
+		ChatJID: "docs@g.us", SenderPhone: "5511999998888", SenderName: "Luana", Text: text, Media: media,
 		ReplyFunc: func(_ context.Context, t string) error {
 			c.mu.Lock()
 			defer c.mu.Unlock()
@@ -147,6 +148,7 @@ func pdfPages(data []byte) int {
 func TestLonePhotoIsUploadedAsIs(t *testing.T) {
 	p, c := &fakePaperless{}, &chat{}
 	h := newHandler(p, &fakeGrouper{})
+	h.SentByField = 4
 	if err := h.Handle(context.Background(), c.msg("1", "", jpegPhoto(t))); err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +157,7 @@ func TestLonePhotoIsUploadedAsIs(t *testing.T) {
 	}
 	h.Wait()
 
-	if len(p.uploads) != 1 || p.uploads[0].name != "whatsapp-20261023-150405.jpg" {
+	if len(p.uploads) != 1 || p.uploads[0].name != "whatsapp-20261023-150405.jpg" || p.uploads[0].fields[4] != "Luana" {
 		t.Fatalf("uploads = %+v", p.uploads)
 	}
 	if c.last("1") != reactDone || len(c.replies) != 0 {

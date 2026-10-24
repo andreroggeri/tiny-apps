@@ -145,6 +145,16 @@ func (c *Client) Groups(ctx context.Context) ([]Group, error) {
 	return out, nil
 }
 
+// Send posts a text message in a chat.
+func (c *Client) Send(ctx context.Context, chatJID, text string) error {
+	jid, err := types.ParseJID(chatJID)
+	if err != nil {
+		return err
+	}
+	_, err = c.cli.SendMessage(ctx, jid, &waE2E.Message{Conversation: proto.String(text)})
+	return err
+}
+
 func (c *Client) onEvent(evt any) {
 	switch e := evt.(type) {
 	case *events.Message:

@@ -89,13 +89,18 @@ func (s *Store) Routes(ctx context.Context) ([]Route, error) {
 	return out, rows.Err()
 }
 
-func (s *Store) IsAllowed(ctx context.Context, phone string) (bool, error) {
+// AllowedSender returns the sender's name and whether they're on the
+// allowlist.
+func (s *Store) AllowedSender(ctx context.Context, phone string) (string, bool, error) {
 	if phone == "" {
-		return false, nil
+		return "", false, nil
 	}
-	var n int
-	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM senders WHERE phone = ?`, phone).Scan(&n)
-	return n > 0, err
+	var name string
+	err := s.db.QueryRowContext(ctx, `SELECT name FROM senders WHERE phone = ?`, phone).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	return name, err == nil, err
 }
 
 func (s *Store) AddSender(ctx context.Context, snd Sender) error {

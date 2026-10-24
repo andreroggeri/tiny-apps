@@ -17,11 +17,16 @@ import (
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/dash"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/grouping"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/handlers/documents"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/notify"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/paperless"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/router"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/settings"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/whatsapp"
 )
+
+// sentByField is the paperless custom field recording who sent a document,
+// created by hand once.
+const sentByField = "Enviado por"
 
 type config struct {
 	DataDir        string
@@ -30,6 +35,7 @@ type config struct {
 	PaperlessToken string
 	LLMURL         string // OpenAI-compatible API with image input; "" disables grouping
 	LLMModel       string
+	NotifyToken    string // bearer token coruja sends to /notify; "" disables it
 }
 
 func loadConfig() (config, error) {
@@ -40,6 +46,7 @@ func loadConfig() (config, error) {
 		PaperlessToken: os.Getenv("PAPERLESS_TOKEN"),
 		LLMURL:         os.Getenv("LLM_URL"),
 		LLMModel:       os.Getenv("LLM_MODEL"),
+		NotifyToken:    os.Getenv("NOTIFY_TOKEN"),
 	}
 	if c.PaperlessURL == "" || c.PaperlessToken == "" {
 		return c, errors.New("PAPERLESS_URL and PAPERLESS_TOKEN are required")
@@ -90,8 +97,12 @@ func run(log *slog.Logger) error {
 	} else {
 		log.Warn("LLM_URL not set: photos sent together are filed as separate documents")
 	}
+	docs := documents.New(pl, grouper, log)
+	if docs.SentByField, err = pl.CustomFieldID(ctx, sentByField); err != nil {
+		log.Warn("not recording who sent documents", "err", err)
+	}
 	rt := router.New(store, map[string]router.Handler{
-		documents.Name: documents.New(pl, grouper, log),
+		documents.Name: docs,
 	}, log)
 
 	wa, err := whatsapp.New(ctx, filepath.Join(cfg.DataDir, "whatsapp.db"), rt.Dispatch, log)
@@ -103,9 +114,13 @@ func run(log *slog.Logger) error {
 	}
 	defer wa.Stop()
 
+	mux := http.NewServeMux()
+	mux.Handle("/", dash.New(wa, store, rt.HandlerNames(), log).Handler())
+	mux.Handle("POST /notify", notify.New(wa, store, cfg.NotifyToken, documents.Name, log))
+
 	srv := &http.Server{
 		Addr:              cfg.Listen,
-		Handler:           dash.New(wa, store, rt.HandlerNames(), log).Handler(),
+		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	srvErr := make(chan error, 1)

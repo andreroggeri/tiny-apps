@@ -31,6 +31,12 @@ number you can afford to lose, never a personal one.
   is about; without it, a text applies to the photos sent right after it. A
   text sent with no photo is kept for 10 minutes for the next one. PDF files
   are uploaded unchanged, with the context as a note.
+- **Who sent it:** the sender's allowlist name goes in the paperless custom
+  field `Enviado por` (create it once, type text). Without the field, it's
+  left out.
+- **Announcements:** [coruja](../coruja) summarizes every new paperless
+  document and calls `POST /notify`; pombo posts title, summary, sender and
+  link in every group routed to `documents`.
 
 ## Dashboard
 
@@ -46,9 +52,10 @@ ingress SSO.
 | `POMBO_DATA_DIR` | `./data` | WhatsApp session and settings (two SQLite files). Back it up. |
 | `POMBO_LISTEN` | `:8080` | Dashboard address |
 | `PAPERLESS_URL` | — | API base the bot calls, e.g. `http://paperless.paperless.svc:8000` |
-| `PAPERLESS_TOKEN` | — | API token of the paperless account documents are uploaded as. Needs add/view document and add note. |
+| `PAPERLESS_TOKEN` | — | API token of the paperless account documents are uploaded as. Needs add/view/delete document, add note and view custom field. |
 | `LLM_URL` | — | OpenAI-compatible API with image input (e.g. llama.cpp), used to group photos. Unset: no grouping. |
 | `LLM_MODEL` | — | Model name, exactly as the server lists it |
+| `NOTIFY_TOKEN` | — | Bearer token coruja sends to `POST /notify`. Unset: the endpoint refuses everything. |
 
 ## Develop
 

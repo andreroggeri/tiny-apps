@@ -40,10 +40,20 @@ func New(baseURL, token string) *Client {
 
 var ErrConsumeFailed = errors.New("paperless failed to consume the document")
 
-// Upload sends a file for consumption and returns the task ID.
-func (c *Client) Upload(ctx context.Context, filename string, data []byte) (string, error) {
+// Upload sends a file for consumption and returns the task ID. fields sets
+// custom fields by ID.
+func (c *Client) Upload(ctx context.Context, filename string, data []byte, fields map[int]string) (string, error) {
 	var body bytes.Buffer
 	w := multipart.NewWriter(&body)
+	if len(fields) > 0 {
+		js, err := json.Marshal(fields)
+		if err != nil {
+			return "", err
+		}
+		if err := w.WriteField("custom_fields", string(js)); err != nil {
+			return "", err
+		}
+	}
 	part, err := w.CreateFormFile("document", filename)
 	if err != nil {
 		return "", err
@@ -109,6 +119,25 @@ func (c *Client) AddNote(ctx context.Context, id int, note string) error {
 		return fmt.Errorf("add note: %w", err)
 	}
 	return nil
+}
+
+// CustomFieldID looks a custom field up by name.
+func (c *Client) CustomFieldID(ctx context.Context, name string) (int, error) {
+	var page struct {
+		Results []struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		} `json:"results"`
+	}
+	if err := c.do(ctx, http.MethodGet, "/api/custom_fields/?name__iexact="+url.QueryEscape(name), nil, "", &page); err != nil {
+		return 0, fmt.Errorf("custom fields: %w", err)
+	}
+	for _, f := range page.Results {
+		if strings.EqualFold(f.Name, name) {
+			return f.ID, nil
+		}
+	}
+	return 0, fmt.Errorf("custom field %q not found", name)
 }
 
 // Content returns a document's OCR text.

@@ -14,6 +14,7 @@ import (
 type Message struct {
 	ChatJID     string
 	SenderPhone string // international format without "+"; "" if unknown
+	SenderName  string // from the allowlist, set by the router
 	Text        string // body or media caption
 	Media       *Media // nil for text-only messages
 
@@ -50,7 +51,7 @@ type Handler interface {
 // Settings is the part of the settings store the router needs.
 type Settings interface {
 	HandlerFor(ctx context.Context, groupJID string) (string, error)
-	IsAllowed(ctx context.Context, phone string) (bool, error)
+	AllowedSender(ctx context.Context, phone string) (name string, ok bool, err error)
 }
 
 type Router struct {
@@ -90,7 +91,7 @@ func (r *Router) Dispatch(ctx context.Context, m Message) {
 		return
 	}
 
-	allowed, err := r.settings.IsAllowed(ctx, m.SenderPhone)
+	senderName, allowed, err := r.settings.AllowedSender(ctx, m.SenderPhone)
 	if err != nil {
 		r.log.Error("allowlist lookup failed", "err", err)
 		return
@@ -99,6 +100,7 @@ func (r *Router) Dispatch(ctx context.Context, m Message) {
 		r.log.Info("ignoring message from sender not on allowlist", "chat", m.ChatJID, "sender", m.SenderPhone)
 		return
 	}
+	m.SenderName = senderName
 
 	if err := h.Handle(ctx, m); err != nil {
 		r.log.Error("handler failed", "handler", name, "chat", m.ChatJID, "err", err)

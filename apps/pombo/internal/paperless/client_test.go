@@ -29,7 +29,7 @@ func fakePaperless(t *testing.T, taskStatus string) *httptest.Server {
 			return
 		}
 		data, _ := io.ReadAll(f)
-		if hdr.Filename != "conta.pdf" || string(data) != "%PDF" {
+		if hdr.Filename != "conta.pdf" || string(data) != "%PDF" || r.FormValue("custom_fields") != `{"4":"Luana"}` {
 			http.Error(w, "unexpected upload", http.StatusBadRequest)
 			return
 		}
@@ -60,6 +60,9 @@ func fakePaperless(t *testing.T, taskStatus string) *httptest.Server {
 	mux.HandleFunc("DELETE /api/documents/42/", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	})
+	mux.HandleFunc("GET /api/custom_fields/", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"results":[{"id":4,"name":"Enviado por"}]}`)
+	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv
@@ -75,7 +78,7 @@ func TestUploadWaitAndNote(t *testing.T) {
 	c := newTestClient(fakePaperless(t, "success").URL)
 	ctx := context.Background()
 
-	taskID, err := c.Upload(ctx, "conta.pdf", []byte("%PDF"))
+	taskID, err := c.Upload(ctx, "conta.pdf", []byte("%PDF"), map[int]string{4: "Luana"})
 	if err != nil || taskID != "task-123" {
 		t.Fatalf("Upload = %q, %v", taskID, err)
 	}
@@ -85,6 +88,16 @@ func TestUploadWaitAndNote(t *testing.T) {
 	}
 	if err := c.AddNote(ctx, id, "carteira de vacinação"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestCustomFieldID(t *testing.T) {
+	c := newTestClient(fakePaperless(t, "success").URL)
+	if id, err := c.CustomFieldID(context.Background(), "enviado por"); err != nil || id != 4 {
+		t.Fatalf("got %d, %v", id, err)
+	}
+	if _, err := c.CustomFieldID(context.Background(), "Resumo"); err == nil {
+		t.Fatal("expected an error for a missing field")
 	}
 }
 
@@ -113,7 +126,7 @@ func TestWaitForDocumentFailure(t *testing.T) {
 
 func TestUploadRejectsBadToken(t *testing.T) {
 	c := New(fakePaperless(t, "success").URL, "wrong")
-	if _, err := c.Upload(context.Background(), "conta.pdf", []byte("%PDF")); err == nil {
+	if _, err := c.Upload(context.Background(), "conta.pdf", []byte("%PDF"), nil); err == nil {
 		t.Fatal("expected an error for a bad token")
 	}
 }

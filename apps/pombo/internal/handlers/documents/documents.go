@@ -35,7 +35,7 @@ const (
 )
 
 type Paperless interface {
-	Upload(ctx context.Context, filename string, data []byte) (string, error)
+	Upload(ctx context.Context, filename string, data []byte, fields map[int]string) (string, error)
 	WaitForDocument(ctx context.Context, taskID string) (int, error)
 	AddNote(ctx context.Context, id int, note string) error
 	Content(ctx context.Context, id int) (string, error)
@@ -115,7 +115,10 @@ type Handler struct {
 	MergeWindow    time.Duration
 	TextWindow     time.Duration
 	ConsumeTimeout time.Duration
-	now            func() time.Time
+	// SentByField is the paperless custom field that records who sent the
+	// document; 0 leaves it out.
+	SentByField int
+	now         func() time.Time
 
 	mu      sync.Mutex
 	batches map[batchKey]*batch
@@ -364,7 +367,15 @@ func (h *Handler) fileAsIs(ctx context.Context, f item, context string) {
 // upload files data in paperless and reacts on msgs, returning the new
 // document's ID and whether it worked.
 func (h *Handler) upload(ctx context.Context, msgs []item, name string, data []byte, note string) (int, bool) {
-	taskID, err := h.paperless.Upload(ctx, name, data)
+	var fields map[int]string
+	if h.SentByField != 0 {
+		by := msgs[0].msg.SenderName
+		if by == "" {
+			by = msgs[0].msg.SenderPhone
+		}
+		fields = map[int]string{h.SentByField: by}
+	}
+	taskID, err := h.paperless.Upload(ctx, name, data, fields)
 	if err != nil {
 		h.fail(ctx, msgs, fmt.Errorf("enviar para o paperless: %w", err))
 		return 0, false

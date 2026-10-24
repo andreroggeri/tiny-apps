@@ -59,11 +59,11 @@ func TestRouteAndSenderForms(t *testing.T) {
 	}
 
 	post(t, h, "/senders", url.Values{"name": {"André"}, "phone": {"+55 (11) 99999-8888"}})
-	if ok, _ := store.IsAllowed(ctx, "5511999998888"); !ok {
+	if name, ok, _ := store.AllowedSender(ctx, "5511999998888"); !ok || name != "André" {
 		t.Fatal("sender not stored with a normalised phone")
 	}
 	post(t, h, "/senders/delete", url.Values{"phone": {"5511999998888"}})
-	if ok, _ := store.IsAllowed(ctx, "5511999998888"); ok {
+	if _, ok, _ := store.AllowedSender(ctx, "5511999998888"); ok {
 		t.Fatal("sender not removed")
 	}
 }

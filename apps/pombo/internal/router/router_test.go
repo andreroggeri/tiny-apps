@@ -18,8 +18,11 @@ func (f fakeSettings) HandlerFor(_ context.Context, jid string) (string, error) 
 	return f.routes[jid], nil
 }
 
-func (f fakeSettings) IsAllowed(_ context.Context, phone string) (bool, error) {
-	return f.allowed[phone], nil
+func (f fakeSettings) AllowedSender(_ context.Context, phone string) (string, bool, error) {
+	if !f.allowed[phone] {
+		return "", false, nil
+	}
+	return "Luana", true, nil
 }
 
 type recordingHandler struct {
@@ -58,6 +61,9 @@ func TestDispatch(t *testing.T) {
 			newRouter(h).Dispatch(context.Background(), tt.msg)
 			if got := len(h.got) == 1; got != tt.called {
 				t.Fatalf("handler called = %v, want %v", got, tt.called)
+			}
+			if tt.called && h.got[0].SenderName != "Luana" {
+				t.Errorf("SenderName = %q, want the allowlist name", h.got[0].SenderName)
 			}
 		})
 	}
