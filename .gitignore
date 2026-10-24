@@ -1,0 +1,22 @@
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# build output
+bin/
+dist/
+*.test
+
+# local state
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# secrets and personal config — every app ships a *.example.* template instead
+.env
+.env.*
+!.env.example
+*.secret.yaml
