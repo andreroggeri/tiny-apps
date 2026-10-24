@@ -20,7 +20,7 @@ number you can afford to lose, never a personal one.
   each other are held, then a vision LLM groups them into documents, so a
   contract photographed page by page becomes one multi-page PDF. Without an
   LLM (or if it fails), each photo becomes its own document.
-- **Late pages:** for 10 minutes after filing, a new photo is compared with the
+- **Late pages:** for an hour after filing, a new photo is compared with the
   sender's last few documents (by their OCR text, or their last page when it
   has little text). If the LLM is at least 90% sure it's another page of one,
   that document is replaced by one with all the pages; the old one goes to

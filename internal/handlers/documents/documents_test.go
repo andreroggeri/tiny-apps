@@ -273,7 +273,7 @@ func TestOldTextIsForgotten(t *testing.T) {
 	h.now = func() time.Time { return now }
 	h.Handle(ctx, c.msg("t", "bom dia", nil))
 	h.Wait()
-	now = now.Add(h.MergeWindow + time.Minute)
+	now = now.Add(h.TextWindow + time.Minute)
 	h.Handle(ctx, c.msg("1", "", jpegPhoto(t)))
 	h.Wait()
 
@@ -316,6 +316,31 @@ func TestLaterPhotoIsAddedToRecentDocument(t *testing.T) {
 	h.Wait()
 	if len(g.asked) != 2 || pdfPages(p.uploads[2].data) != 3 || !reflect.DeepEqual(p.deleted, []int{1, 2}) {
 		t.Errorf("asked %d times, deleted %v", len(g.asked), p.deleted)
+	}
+}
+
+func TestMergeWindow(t *testing.T) {
+	p, c := &fakePaperless{}, &chat{}
+	g := &fakeGrouper{same: 1}
+	h := newHandler(p, g)
+	ctx := context.Background()
+	now := time.Date(2026, 10, 24, 12, 52, 0, 0, time.UTC)
+	h.now = func() time.Time { return now }
+
+	h.Handle(ctx, c.msg("1", "", jpegPhoto(t)))
+	h.Wait()
+	now = now.Add(38 * time.Minute) // the real CNH case: still within the window
+	h.Handle(ctx, c.msg("2", "", jpegPhoto(t)))
+	h.Wait()
+	if len(g.asked) != 1 || len(p.deleted) != 1 {
+		t.Fatalf("38 min later: asked %d times, deleted %v", len(g.asked), p.deleted)
+	}
+
+	now = now.Add(h.MergeWindow + time.Minute)
+	h.Handle(ctx, c.msg("3", "", jpegPhoto(t)))
+	h.Wait()
+	if len(g.asked) != 1 {
+		t.Fatalf("a document older than MergeWindow was compared")
 	}
 }
 

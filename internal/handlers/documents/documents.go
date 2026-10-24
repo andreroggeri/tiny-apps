@@ -108,11 +108,12 @@ type Handler struct {
 	log       *slog.Logger
 
 	// BatchWindow is how long to wait after the last photo or text before
-	// filing the batch. MergeWindow is how long a filed document (or text
-	// with no photo) stays open to photos sent later. ConsumeTimeout bounds
-	// OCR + consumption per document.
+	// filing the batch. MergeWindow is how long a filed document stays open
+	// to more pages, and TextWindow how long a text sent with no photo waits
+	// for one. ConsumeTimeout bounds OCR + consumption per document.
 	BatchWindow    time.Duration
 	MergeWindow    time.Duration
+	TextWindow     time.Duration
 	ConsumeTimeout time.Duration
 	now            func() time.Time
 
@@ -128,7 +129,10 @@ func New(p Paperless, g Grouper, log *slog.Logger) *Handler {
 		grouper:        g,
 		log:            log,
 		BatchWindow:    30 * time.Second,
-		MergeWindow:    10 * time.Minute,
+		// People screenshot or photograph pages, then send them over the
+		// next half hour or so.
+		MergeWindow:    time.Hour,
+		TextWindow:     10 * time.Minute,
 		ConsumeTimeout: 10 * time.Minute,
 		now:            time.Now,
 		batches:        map[batchKey]*batch{},
@@ -194,16 +198,16 @@ func (h *Handler) flush(key batchKey) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	cutoff := h.now().Add(-h.MergeWindow)
-	s.recent = slices.DeleteFunc(s.recent, func(f *filed) bool { return f.at.Before(cutoff) })
+	now := h.now()
+	s.recent = slices.DeleteFunc(s.recent, func(f *filed) bool { return f.at.Before(now.Add(-h.MergeWindow)) })
 	var entries []item
-	if s.textAt.After(cutoff) {
+	if s.textAt.After(now.Add(-h.TextWindow)) {
 		entries = s.texts
 	}
 	entries = append(slices.Clip(entries), b.items...)
 	s.texts = nil
 	if !slices.ContainsFunc(entries, func(it item) bool { return !it.isText() }) {
-		s.texts, s.textAt = entries, h.now()
+		s.texts, s.textAt = entries, now
 		return
 	}
 
