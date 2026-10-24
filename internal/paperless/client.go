@@ -1,5 +1,5 @@
 // Package paperless is a minimal client for the paperless-ngx REST API:
-// upload a document, wait for it to be consumed, and read it back.
+// upload a document, wait for it to be consumed, read its text, and delete it.
 package paperless
 
 import (
@@ -111,6 +111,26 @@ func (c *Client) AddNote(ctx context.Context, id int, note string) error {
 	return nil
 }
 
+// Content returns a document's OCR text.
+func (c *Client) Content(ctx context.Context, id int) (string, error) {
+	var doc struct {
+		Content string `json:"content"`
+	}
+	if err := c.do(ctx, http.MethodGet, "/api/documents/"+strconv.Itoa(id)+"/", nil, "", &doc); err != nil {
+		return "", fmt.Errorf("get document: %w", err)
+	}
+	return doc.Content, nil
+}
+
+// Delete moves a document to paperless' trash.
+func (c *Client) Delete(ctx context.Context, id int) error {
+	if err := c.do(ctx, http.MethodDelete, "/api/documents/"+strconv.Itoa(id)+"/", nil, "", nil); err != nil {
+		return fmt.Errorf("delete document: %w", err)
+	}
+	return nil
+}
+
+// do sends a request and decodes the JSON response into out, if not nil.
 func (c *Client) do(ctx context.Context, method, path string, body io.Reader, contentType string, out any) error {
 	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
 	if err != nil {
@@ -129,6 +149,9 @@ func (c *Client) do(ctx context.Context, method, path string, body io.Reader, co
 	if resp.StatusCode >= 300 {
 		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		return fmt.Errorf("%s %s: %s: %s", method, path, resp.Status, bytes.TrimSpace(msg))
+	}
+	if out == nil {
+		return nil
 	}
 	return json.NewDecoder(resp.Body).Decode(out)
 }

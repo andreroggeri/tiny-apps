@@ -20,10 +20,17 @@ number you can afford to lose, never a personal one.
   each other are held, then a vision LLM groups them into documents, so a
   contract photographed page by page becomes one multi-page PDF. Without an
   LLM (or if it fails), each photo becomes its own document.
-- **Context:** a caption, or a text message sent in the same batch
-  ("carteira de vacinação do bebê"), is added as a final page of the PDF, so
-  paperless' AI suggestions and search read it. PDF files are uploaded
-  unchanged, with the context as a note.
+- **Late pages:** for 10 minutes after filing, a new photo is compared with the
+  sender's last few documents (by their OCR text, or their last page when it
+  has little text). If the LLM is at least 90% sure it's another page of one,
+  that document is replaced by one with all the pages; the old one goes to
+  paperless' trash. This needs the delete-document permission.
+- **Context:** a caption or a text message ("carteira de vacinação do bebê")
+  is added as a final page of the PDF it's about, so paperless' AI
+  suggestions and search read it. The LLM decides which document each text
+  is about; without it, a text applies to the photos sent right after it. A
+  text sent with no photo is kept for 10 minutes for the next one. PDF files
+  are uploaded unchanged, with the context as a note.
 
 ## Dashboard
 

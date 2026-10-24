@@ -54,6 +54,12 @@ func fakePaperless(t *testing.T, taskStatus string) *httptest.Server {
 		}
 		io.WriteString(w, `[{"id":1,"note":"carteira de vacinação"}]`)
 	})
+	mux.HandleFunc("GET /api/documents/42/", func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"id":42,"content":"CONTA DE LUZ setembro"}`)
+	})
+	mux.HandleFunc("DELETE /api/documents/42/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
 	return srv
@@ -79,6 +85,21 @@ func TestUploadWaitAndNote(t *testing.T) {
 	}
 	if err := c.AddNote(ctx, id, "carteira de vacinação"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestContentAndDelete(t *testing.T) {
+	c := newTestClient(fakePaperless(t, "success").URL)
+	ctx := context.Background()
+	text, err := c.Content(ctx, 42)
+	if err != nil || text != "CONTA DE LUZ setembro" {
+		t.Fatalf("Content = %q, %v", text, err)
+	}
+	if err := c.Delete(ctx, 42); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Delete(ctx, 43); err == nil {
+		t.Fatal("expected an error deleting a missing document")
 	}
 }
 
