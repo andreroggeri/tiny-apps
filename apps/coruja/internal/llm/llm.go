@@ -34,8 +34,9 @@ func New(baseURL, model string) *Client {
 	return &Client{url: strings.TrimRight(baseURL, "/") + "/chat/completions", model: model, http: &http.Client{Timeout: 3 * time.Minute}}
 }
 
-// Document is what the model sees: the OCR text and, for photos, the image
-// itself (OCR of a phone photo or screenshot is often garbage).
+// Document is what the model sees: the OCR text and, for photos and PDFs of
+// photos, the (first) image itself: OCR of a phone photo or screenshot is
+// often garbage.
 type Document struct {
 	Text     string
 	Image    []byte
@@ -70,7 +71,11 @@ func (c *Client) Summarize(ctx context.Context, doc Document) (Summary, error) {
 				text = text[:len(text)-1]
 			}
 		}
-		content = append(content, map[string]any{"type": "text", "text": "Texto extraído (OCR):\n" + text})
+		label := "Texto extraído (OCR):\n"
+		if doc.Image != nil {
+			label = "Texto extraído (OCR, pode ter erros; na dúvida, vale a imagem):\n"
+		}
+		content = append(content, map[string]any{"type": "text", "text": label + text})
 	}
 	if content == nil {
 		return Summary{}, fmt.Errorf("llm: document has no text or image")
@@ -82,6 +87,9 @@ func (c *Client) Summarize(ctx context.Context, doc Document) (Summary, error) {
 		"messages": []map[string]any{{"role": "user", "content": content}},
 		// A short description; thinking would only add latency.
 		"chat_template_kwargs": map[string]any{"enable_thinking": false},
+		// Reading facts off a page, not writing: at the default temperature
+		// garbled OCR made it pick the issue date as the expiry date.
+		"temperature": 0,
 		"response_format": map[string]any{
 			"type": "json_schema",
 			"json_schema": map[string]any{

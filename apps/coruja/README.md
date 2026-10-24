@@ -5,7 +5,8 @@ is. Paperless calls it when a document is added; coruja waits for paperless'
 own AI to finish with it, then:
 
 1. asks Gemma for a title and a one-line summary (from the OCR text, plus the
-   photo itself for JPEG/PNG documents, whose OCR is often garbage),
+   photo itself for JPEG/PNG documents and the first photo of a PDF made of
+   photos, whose OCR is often garbage),
 2. stores the summary in the custom field `Resumo`, and the title too if the
    document still has its file name as title (a title someone chose is kept),
 3. clears the owner of the document's tags, correspondent and document type,
@@ -62,4 +63,4 @@ chart lives in the infrastructure repo (`k3s/charts/coruja`).
 - The queue is in memory. A restart while a document waits for paperless'
   AI (2–3 minutes) loses that document's summary and announcement; re-run
   the workflow on it in paperless to redo it.
-- PDFs are summarized from their OCR text only.
+- Only the first photo of a PDF is sent; later pages go by their OCR text.

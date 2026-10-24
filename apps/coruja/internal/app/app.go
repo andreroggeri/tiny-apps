@@ -17,6 +17,7 @@ import (
 
 	"github.com/andreroggeri/tiny-apps/apps/coruja/internal/llm"
 	"github.com/andreroggeri/tiny-apps/apps/coruja/internal/paperless"
+	"github.com/andreroggeri/tiny-apps/apps/coruja/internal/pdfimage"
 )
 
 type Paperless interface {
@@ -149,11 +150,22 @@ func (a *App) Process(ctx context.Context, id int) error {
 	}
 
 	in := llm.Document{Text: doc.Content}
-	if doc.MimeType == "image/jpeg" || doc.MimeType == "image/png" {
+	switch doc.MimeType {
+	case "image/jpeg", "image/png":
 		if in.Image, err = a.paperless.Original(ctx, id); err != nil {
 			a.log.Warn("could not download the photo; using its text only", "document", id, "err", err)
 		}
 		in.MimeType = doc.MimeType
+	case "application/pdf":
+		// A PDF of photos (pombo's) has garbled OCR text, enough to get a
+		// date wrong; its first page as an image fixes that. A PDF with
+		// real text has no photo and goes by its text.
+		data, err := a.paperless.Original(ctx, id)
+		if err != nil {
+			a.log.Warn("could not download the PDF; using its text only", "document", id, "err", err)
+		} else if in.Image = pdfimage.FirstJPEG(data, 20<<10); in.Image != nil {
+			in.MimeType = "image/jpeg"
+		}
 	}
 	title := doc.Title
 	s, err := a.llm.Summarize(ctx, in)
