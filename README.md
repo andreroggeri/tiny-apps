@@ -14,6 +14,7 @@ survive load, and none of it is built for anyone else.
 | App | What it does | Runtime | Status |
 | --- | --- | --- | --- |
 | [pombo](apps/pombo) | WhatsApp bot for the family groups. Files photos and PDFs sent to the documents group in paperless, grouped into documents by a vision LLM. | Go + SQLite | running |
+| [coruja](apps/coruja) | Summarizes every new paperless document (title + one line) and asks pombo to announce it. Called by a paperless workflow webhook. | Go | new |
 
 ## Conventions
 
