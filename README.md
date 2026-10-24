@@ -5,11 +5,25 @@ each group is routed to a handler:
 
 | Handler | What it does |
 |---|---|
-| `documents` | Photos and PDFs sent to the group are filed in paperless-ngx; the bot replies with the title, correspondent and tags its AI workflow picked. |
+| `documents` | Files photos and PDFs in paperless-ngx (details below). |
 
 It connects as a linked device of a spare WhatsApp number (via
 [whatsmeow](https://github.com/tulir/whatsmeow)), so it's unofficial: use a
 number you can afford to lose, never a personal one.
+
+## Documents handler
+
+- **Reactions show progress:** ⏳ when a photo arrives, ✅ once paperless has
+  filed it, ❌ (plus a reply saying why) if it fails. A text message that's
+  picked up as context gets 📝.
+- **Photos are batched:** photos from the same person arriving within 30 s of
+  each other are held, then a vision LLM groups them into documents, so a
+  contract photographed page by page becomes one multi-page PDF. Without an
+  LLM (or if it fails), each photo becomes its own document.
+- **Context:** a caption, or a text message sent in the same batch
+  ("carteira de vacinação do bebê"), is added as a final page of the PDF, so
+  paperless' AI suggestions and search read it. PDF files are uploaded
+  unchanged, with the context as a note.
 
 ## Dashboard
 
@@ -25,8 +39,9 @@ ingress SSO.
 | `POMBO_DATA_DIR` | `./data` | WhatsApp session and settings (two SQLite files). Back it up. |
 | `POMBO_LISTEN` | `:8080` | Dashboard address |
 | `PAPERLESS_URL` | — | API base the bot calls, e.g. `http://paperless.paperless.svc:8000` |
-| `PAPERLESS_PUBLIC_URL` | `PAPERLESS_URL` | Base for links sent to the chat |
-| `PAPERLESS_TOKEN` | — | API token of the paperless account documents are uploaded as |
+| `PAPERLESS_TOKEN` | — | API token of the paperless account documents are uploaded as. Needs add/view document and add note. |
+| `LLM_URL` | — | OpenAI-compatible API with image input (e.g. llama.cpp), used to group photos. Unset: no grouping. |
+| `LLM_MODEL` | — | Model name, exactly as the server lists it |
 
 ## Develop
 

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/andreroggeri/pombo/internal/dash"
+	"github.com/andreroggeri/pombo/internal/grouping"
 	"github.com/andreroggeri/pombo/internal/handlers/documents"
 	"github.com/andreroggeri/pombo/internal/paperless"
 	"github.com/andreroggeri/pombo/internal/router"
@@ -23,26 +24,28 @@ import (
 )
 
 type config struct {
-	DataDir            string
-	Listen             string
-	PaperlessURL       string // API base, reachable from the bot
-	PaperlessPublicURL string // used in links sent to the chat
-	PaperlessToken     string
+	DataDir        string
+	Listen         string
+	PaperlessURL   string // API base, reachable from the bot
+	PaperlessToken string
+	LLMURL         string // OpenAI-compatible API with image input; "" disables grouping
+	LLMModel       string
 }
 
 func loadConfig() (config, error) {
 	c := config{
-		DataDir:            getenv("POMBO_DATA_DIR", "./data"),
-		Listen:             getenv("POMBO_LISTEN", ":8080"),
-		PaperlessURL:       os.Getenv("PAPERLESS_URL"),
-		PaperlessPublicURL: os.Getenv("PAPERLESS_PUBLIC_URL"),
-		PaperlessToken:     os.Getenv("PAPERLESS_TOKEN"),
+		DataDir:        getenv("POMBO_DATA_DIR", "./data"),
+		Listen:         getenv("POMBO_LISTEN", ":8080"),
+		PaperlessURL:   os.Getenv("PAPERLESS_URL"),
+		PaperlessToken: os.Getenv("PAPERLESS_TOKEN"),
+		LLMURL:         os.Getenv("LLM_URL"),
+		LLMModel:       os.Getenv("LLM_MODEL"),
 	}
 	if c.PaperlessURL == "" || c.PaperlessToken == "" {
 		return c, errors.New("PAPERLESS_URL and PAPERLESS_TOKEN are required")
 	}
-	if c.PaperlessPublicURL == "" {
-		c.PaperlessPublicURL = c.PaperlessURL
+	if c.LLMURL != "" && c.LLMModel == "" {
+		return c, errors.New("LLM_MODEL is required when LLM_URL is set")
 	}
 	return c, nil
 }
@@ -81,8 +84,14 @@ func run(log *slog.Logger) error {
 	defer store.Close()
 
 	pl := paperless.New(cfg.PaperlessURL, cfg.PaperlessToken)
+	var grouper documents.Grouper
+	if cfg.LLMURL != "" {
+		grouper = grouping.NewLLM(cfg.LLMURL, cfg.LLMModel)
+	} else {
+		log.Warn("LLM_URL not set: photos sent together are filed as separate documents")
+	}
 	rt := router.New(store, map[string]router.Handler{
-		documents.Name: documents.New(pl, cfg.PaperlessPublicURL),
+		documents.Name: documents.New(pl, grouper, log),
 	}, log)
 
 	wa, err := whatsapp.New(ctx, filepath.Join(cfg.DataDir, "whatsapp.db"), rt.Dispatch, log)

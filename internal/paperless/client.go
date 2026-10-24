@@ -38,13 +38,6 @@ func New(baseURL, token string) *Client {
 	}
 }
 
-type Document struct {
-	ID            int
-	Title         string
-	Tags          []string
-	Correspondent string
-}
-
 var ErrConsumeFailed = errors.New("paperless failed to consume the document")
 
 // Upload sends a file for consumption and returns the task ID.
@@ -104,66 +97,18 @@ func (c *Client) WaitForDocument(ctx context.Context, taskID string) (int, error
 	}
 }
 
-// WaitForTitleChange polls the document until its title differs from initial
-// (i.e. the AI workflow has renamed it) or ctx expires, and returns the latest
-// state either way. A ctx deadline is not an error here.
-func (c *Client) WaitForTitleChange(ctx context.Context, id int, initial string) (Document, error) {
-	var doc Document
-	var err error
-	for {
-		doc, err = c.Document(context.WithoutCancel(ctx), id)
-		if err != nil || doc.Title != initial {
-			return doc, err
-		}
-		if c.sleep(ctx) != nil {
-			return doc, nil
-		}
+// AddNote attaches a note to a document.
+func (c *Client) AddNote(ctx context.Context, id int, note string) error {
+	body, err := json.Marshal(map[string]string{"note": note})
+	if err != nil {
+		return err
 	}
-}
-
-// Document fetches a document with tag and correspondent names resolved.
-func (c *Client) Document(ctx context.Context, id int) (Document, error) {
-	var raw struct {
-		ID            int    `json:"id"`
-		Title         string `json:"title"`
-		Tags          []int  `json:"tags"`
-		Correspondent *int   `json:"correspondent"`
+	var ignored json.RawMessage
+	path := "/api/documents/" + strconv.Itoa(id) + "/notes/"
+	if err := c.do(ctx, http.MethodPost, path, bytes.NewReader(body), "application/json", &ignored); err != nil {
+		return fmt.Errorf("add note: %w", err)
 	}
-	if err := c.do(ctx, http.MethodGet, "/api/documents/"+strconv.Itoa(id)+"/", nil, "", &raw); err != nil {
-		return Document{}, fmt.Errorf("get document: %w", err)
-	}
-	doc := Document{ID: raw.ID, Title: raw.Title}
-
-	if len(raw.Tags) > 0 {
-		ids := make([]string, len(raw.Tags))
-		for i, t := range raw.Tags {
-			ids[i] = strconv.Itoa(t)
-		}
-		var tags struct {
-			Results []struct {
-				Name string `json:"name"`
-			} `json:"results"`
-		}
-		path := "/api/tags/?page_size=100&id__in=" + strings.Join(ids, ",")
-		if err := c.do(ctx, http.MethodGet, path, nil, "", &tags); err != nil {
-			return Document{}, fmt.Errorf("get tags: %w", err)
-		}
-		for _, t := range tags.Results {
-			doc.Tags = append(doc.Tags, t.Name)
-		}
-	}
-
-	if raw.Correspondent != nil {
-		var corr struct {
-			Name string `json:"name"`
-		}
-		path := "/api/correspondents/" + strconv.Itoa(*raw.Correspondent) + "/"
-		if err := c.do(ctx, http.MethodGet, path, nil, "", &corr); err != nil {
-			return Document{}, fmt.Errorf("get correspondent: %w", err)
-		}
-		doc.Correspondent = corr.Name
-	}
-	return doc, nil
+	return nil
 }
 
 func (c *Client) do(ctx context.Context, method, path string, body io.Reader, contentType string, out any) error {

@@ -174,6 +174,10 @@ func (c *Client) handleMessage(e *events.Message) {
 			_, err := c.cli.SendMessage(ctx, e.Info.Chat, replyTo(e, text))
 			return err
 		},
+		ReactFunc: func(ctx context.Context, emoji string) error {
+			_, err := c.cli.SendMessage(ctx, e.Info.Chat, c.cli.BuildReaction(e.Info.Chat, e.Info.Sender, e.Info.ID, emoji))
+			return err
+		},
 	}
 	c.onMessage(ctx, m)
 }

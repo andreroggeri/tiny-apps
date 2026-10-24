@@ -18,6 +18,7 @@ type Message struct {
 	Media       *Media // nil for text-only messages
 
 	ReplyFunc func(ctx context.Context, text string) error
+	ReactFunc func(ctx context.Context, emoji string) error
 }
 
 func (m Message) Reply(ctx context.Context, text string) error {
@@ -25,6 +26,14 @@ func (m Message) Reply(ctx context.Context, text string) error {
 		return nil
 	}
 	return m.ReplyFunc(ctx, text)
+}
+
+// React puts an emoji reaction on the message; a later reaction replaces it.
+func (m Message) React(ctx context.Context, emoji string) error {
+	if m.ReactFunc == nil {
+		return nil
+	}
+	return m.ReactFunc(ctx, emoji)
 }
 
 // Media is an attachment. Download is lazy so ignored messages cost nothing.
@@ -93,6 +102,7 @@ func (r *Router) Dispatch(ctx context.Context, m Message) {
 
 	if err := h.Handle(ctx, m); err != nil {
 		r.log.Error("handler failed", "handler", name, "chat", m.ChatJID, "err", err)
+		_ = m.React(ctx, "❌")
 		if rerr := m.Reply(ctx, fmt.Sprintf("⚠️ Não consegui processar: %v", err)); rerr != nil {
 			r.log.Error("reply failed", "err", rerr)
 		}

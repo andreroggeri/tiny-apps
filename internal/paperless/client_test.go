@@ -2,6 +2,7 @@ package paperless
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -12,11 +13,10 @@ import (
 )
 
 // fakePaperless serves the handful of endpoints the client uses. The task
-// stays pending for one poll, and the document is renamed by "the AI" after
-// it's been read twice.
+// stays pending for one poll.
 func fakePaperless(t *testing.T, taskStatus string) *httptest.Server {
 	t.Helper()
-	var taskPolls, docReads atomic.Int32
+	var taskPolls atomic.Int32
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/documents/post_document/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Token secret" {
@@ -46,22 +46,13 @@ func fakePaperless(t *testing.T, taskStatus string) *httptest.Server {
 		}
 		io.WriteString(w, `{"results":[{"status":"`+taskStatus+`","related_document_ids":[42],"result_data":{"error":"bad pdf"}}]}`)
 	})
-	mux.HandleFunc("GET /api/documents/42/", func(w http.ResponseWriter, r *http.Request) {
-		if docReads.Add(1) <= 2 {
-			io.WriteString(w, `{"id":42,"title":"conta","tags":[],"correspondent":null}`)
+	mux.HandleFunc("POST /api/documents/42/notes/", func(w http.ResponseWriter, r *http.Request) {
+		var body struct{ Note string }
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Note != "carteira de vacinação" {
+			http.Error(w, "unexpected note", http.StatusBadRequest)
 			return
 		}
-		io.WriteString(w, `{"id":42,"title":"Fatura Enel - Setembro/2026","tags":[1,2],"correspondent":7}`)
-	})
-	mux.HandleFunc("GET /api/tags/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("id__in") != "1,2" {
-			http.Error(w, "wrong tags", http.StatusBadRequest)
-			return
-		}
-		io.WriteString(w, `{"results":[{"name":"Contas"},{"name":"Casa"}]}`)
-	})
-	mux.HandleFunc("GET /api/correspondents/7/", func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, `{"name":"Enel"}`)
+		io.WriteString(w, `[{"id":1,"note":"carteira de vacinação"}]`)
 	})
 	srv := httptest.NewServer(mux)
 	t.Cleanup(srv.Close)
@@ -74,7 +65,7 @@ func newTestClient(url string) *Client {
 	return c
 }
 
-func TestUploadWaitAndRead(t *testing.T) {
+func TestUploadWaitAndNote(t *testing.T) {
 	c := newTestClient(fakePaperless(t, "success").URL)
 	ctx := context.Background()
 
@@ -86,12 +77,8 @@ func TestUploadWaitAndRead(t *testing.T) {
 	if err != nil || id != 42 {
 		t.Fatalf("WaitForDocument = %d, %v", id, err)
 	}
-	doc, err := c.WaitForTitleChange(ctx, id, "conta")
-	if err != nil {
+	if err := c.AddNote(ctx, id, "carteira de vacinação"); err != nil {
 		t.Fatal(err)
-	}
-	if doc.Title != "Fatura Enel - Setembro/2026" || doc.Correspondent != "Enel" || len(doc.Tags) != 2 || doc.Tags[0] != "Contas" {
-		t.Fatalf("unexpected document: %+v", doc)
 	}
 }
 
@@ -100,17 +87,6 @@ func TestWaitForDocumentFailure(t *testing.T) {
 	_, err := c.WaitForDocument(context.Background(), "task-123")
 	if !errors.Is(err, ErrConsumeFailed) {
 		t.Fatalf("err = %v, want ErrConsumeFailed", err)
-	}
-}
-
-func TestWaitForTitleChangeReturnsLatestOnTimeout(t *testing.T) {
-	c := newTestClient(fakePaperless(t, "success").URL)
-	c.pollInterval = time.Hour // never gets to the renamed version
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-	defer cancel()
-	doc, err := c.WaitForTitleChange(ctx, 42, "conta")
-	if err != nil || doc.Title != "conta" {
-		t.Fatalf("got %+v, %v; want the un-renamed document and no error", doc, err)
 	}
 }
 
