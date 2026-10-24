@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/andreroggeri/pombo/internal/settings"
-	"github.com/andreroggeri/pombo/internal/whatsapp"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/settings"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/whatsapp"
 )
 
 type fakeWA struct{ status whatsapp.Status }

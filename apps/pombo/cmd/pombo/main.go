@@ -14,13 +14,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andreroggeri/pombo/internal/dash"
-	"github.com/andreroggeri/pombo/internal/grouping"
-	"github.com/andreroggeri/pombo/internal/handlers/documents"
-	"github.com/andreroggeri/pombo/internal/paperless"
-	"github.com/andreroggeri/pombo/internal/router"
-	"github.com/andreroggeri/pombo/internal/settings"
-	"github.com/andreroggeri/pombo/internal/whatsapp"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/dash"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/grouping"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/handlers/documents"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/paperless"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/router"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/settings"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/whatsapp"
 )
 
 type config struct {

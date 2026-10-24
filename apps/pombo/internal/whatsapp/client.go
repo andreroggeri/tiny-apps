@@ -17,7 +17,7 @@ import (
 	waLog "go.mau.fi/whatsmeow/util/log"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/andreroggeri/pombo/internal/router"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/router"
 
 	_ "modernc.org/sqlite"
 )

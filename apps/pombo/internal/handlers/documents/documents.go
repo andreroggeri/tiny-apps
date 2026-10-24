@@ -19,9 +19,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/andreroggeri/pombo/internal/grouping"
-	"github.com/andreroggeri/pombo/internal/pdf"
-	"github.com/andreroggeri/pombo/internal/router"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/grouping"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/pdf"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/router"
 )
 
 // Name is the handler name shown in the dashboard.
@@ -125,10 +125,10 @@ type Handler struct {
 
 func New(p Paperless, g Grouper, log *slog.Logger) *Handler {
 	return &Handler{
-		paperless:      p,
-		grouper:        g,
-		log:            log,
-		BatchWindow:    30 * time.Second,
+		paperless:   p,
+		grouper:     g,
+		log:         log,
+		BatchWindow: 30 * time.Second,
 		// People screenshot or photograph pages, then send them over the
 		// next half hour or so.
 		MergeWindow:    time.Hour,

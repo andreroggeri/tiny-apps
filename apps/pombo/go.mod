@@ -1,4 +1,4 @@
-module github.com/andreroggeri/pombo
+module github.com/andreroggeri/tiny-apps/apps/pombo
 
 go 1.27.0
 

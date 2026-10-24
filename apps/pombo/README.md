@@ -53,15 +53,16 @@ ingress SSO.
 ## Develop
 
 ```sh
-go test ./...
+make test
 POMBO_DATA_DIR=./data PAPERLESS_URL=https://docs.example PAPERLESS_TOKEN=... go run ./cmd/pombo
 ```
 
 ## Release
 
-Every push to `main` builds `ghcr.io/andreroggeri/pombo:sha-<commit>` (and
-`latest`) for amd64 and arm64 after the tests pass; a `vX.Y.Z` tag also
-publishes `X.Y.Z`. See `.github/workflows/release.yml`.
+Every push to `main` that touches `apps/pombo` builds
+`ghcr.io/andreroggeri/tiny-apps/pombo:sha-<commit>` (and `latest`) for amd64
+and arm64 after the tests pass. See `.github/workflows/pombo.yml` at the repo
+root.
 
 Then set the tag in `k3s/applications/pombo/values.yaml` in the infrastructure
 repo and deploy with `helmfile -l name=pombo --skip-deps sync`.

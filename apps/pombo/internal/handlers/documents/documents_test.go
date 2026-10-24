@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andreroggeri/pombo/internal/grouping"
-	"github.com/andreroggeri/pombo/internal/router"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/grouping"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/router"
 )
 
 type upload struct {

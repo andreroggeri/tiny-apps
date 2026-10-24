@@ -15,8 +15,8 @@ import (
 
 	qrcode "github.com/skip2/go-qrcode"
 
-	"github.com/andreroggeri/pombo/internal/settings"
-	"github.com/andreroggeri/pombo/internal/whatsapp"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/settings"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/whatsapp"
 )
 
 //go:embed page.html
