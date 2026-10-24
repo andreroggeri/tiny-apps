@@ -52,7 +52,9 @@ Responda em português:
 - "title": um título curto e específico, como uma pessoa daria (ex.: "Conta de luz Enel setembro 2026", "CNH do André").
   No máximo 60 caracteres.
 - "summary": uma frase dizendo o que é o documento e o mais importante nele (valores, datas, vencimentos, nomes).
-  No máximo 140 caracteres. Sem repetir o título.`
+  No máximo 140 caracteres. Sem repetir o título.
+Nunca inclua números de documentos (CPF, RG, CNH, registro, conta, código de barras, chave Pix):
+o resumo é enviado num grupo de WhatsApp.`
 
 func (c *Client) Summarize(ctx context.Context, doc Document) (Summary, error) {
 	var content []map[string]any
