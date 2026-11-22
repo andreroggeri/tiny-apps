@@ -41,16 +41,18 @@ number you can afford to lose, never a personal one.
 
 ## Reservas handler
 
-- **Ask in plain Portuguese:** "unha sábado 15h às 18h", "manicure 05/12 das
-  14 às 16h". If the day, start or end is missing, the bot asks ("Das 15h até
-  que horas?") and waits 15 minutes for the answer. "cancela" drops it.
+- **Ask in plain Portuguese:** "unha sábado 15h às 18h", "manicure dia 5 das
+  3 às 6 da tarde". The LLM (`LLM_URL`) reads every message; without it the
+  handler is off. If the day, start or end is missing, the bot asks ("Das 15h
+  até que horas?") and waits 15 minutes for the answer. "esquece" drops it,
+  and asking what's scheduled lists saved requests.
 - **Whole range:** the chair is booked in 2-hour slots (6h–22h), so every slot
   touching the range is booked: 15h–18h takes 14–16 and 16–18.
 - **Partial results stay:** slots that couldn't be booked are listed with the
   site's reason; the booked ones are kept.
 - **Dates not open yet:** a date opens 30 days ahead at midnight. Requests for
   later dates are saved, tried every 2 s from just before midnight for 10
-  minutes, and the result is posted in the group. "reservas" lists them. The
+  minutes, and the result is posted in the group. The
   session is checked 30 minutes before; if it's dead, the group is told.
 - **Login:** the site's login (email + emailed code, behind reCAPTCHA) is not
   done by pombo. A session comes from a separate login service
@@ -75,7 +77,7 @@ ingress SSO.
 | `POMBO_LISTEN` | `:8080` | Dashboard address |
 | `PAPERLESS_URL` | — | API base the bot calls, e.g. `http://paperless.paperless.svc:8000` |
 | `PAPERLESS_TOKEN` | — | API token of the paperless account documents are uploaded as. Needs add/view/delete document, add note and view custom field. |
-| `LLM_URL` | — | OpenAI-compatible API with image input (e.g. llama.cpp), used to group photos. Unset: no grouping. |
+| `LLM_URL` | — | OpenAI-compatible API with image input (e.g. llama.cpp), used to group photos and to read booking messages. Unset: no grouping, and no reservas handler. |
 | `LLM_MODEL` | — | Model name, exactly as the server lists it |
 | `SUPERLOGICA_URL` | `https://kpgadministrado.superlogica.net` | Condo site |
 | `SUPERLOGICA_CONDO_ID` / `SUPERLOGICA_UNIT_ID` | `58` / `6471` | Condo and apartment on the site |

@@ -29,7 +29,23 @@ The site's login is email + a code sent by email, at
 - Handle one login at a time. Pombo never sends two at once, but a second
   call while one is running should wait or fail, not start a parallel login.
 
-Where the emailed code comes from is up to the service.
+## Getting the emailed code
+
+A Gmail filter forwards Superlogica's code emails to
+`otp-superlogica@roggeri.com.br`. A Cloudflare Worker (`otp-relay`, in the
+infrastructure repo under `pulumi/homelab/otp-relay`) keeps the latest one for
+10 minutes. Poll it right after asking for the code:
+
+```
+GET https://otp.roggeri.com.br/codes/superlogica?since=<epoch ms when you asked>
+Authorization: Bearer <token>
+```
+
+- `404` until an email arrives after `since`; poll every 2–3 s.
+- `200` with `{"code": "482913", "from": "...", "subject": "...", "receivedAt": 1795..., "text": "..."}`.
+  `code` is `null` if no 4–9 digit number was found; read `text` then.
+- Token: `pulumi stack output otpRelayToken --show-secrets` (infrastructure
+  repo). Give it to the service as an env var, never in code.
 
 ## How to validate
 

@@ -71,6 +71,30 @@ func (c *clock) set(t time.Time) { c.mu.Lock(); defer c.mu.Unlock(); c.t = t }
 
 var sp, _ = time.LoadLocation("America/Sao_Paulo")
 
+// fakeLLM answers from a table, as the model would.
+type fakeLLM struct {
+	answers   map[string]parsed
+	questions []string // what the bot had asked, per call
+}
+
+func (f *fakeLLM) interpret(_ context.Context, _ time.Time, _ *draft, question, text string) (parsed, error) {
+	f.questions = append(f.questions, question)
+	return f.answers[text], nil
+}
+
+func day(m time.Month, d int) time.Time { return time.Date(2026, m, d, 0, 0, 0, 0, sp) }
+
+var answers = map[string]parsed{
+	"unha sábado 15h":              {related: true, mentionsChair: true, date: day(11, 28), start: 15},
+	"18h":                          {related: true, end: 18},
+	"unha 05/12 14h às 18h":        {related: true, mentionsChair: true, date: day(12, 5), start: 14, end: 18},
+	"unha amanhã 21h às 23h":       {related: true, mentionsChair: true, date: day(11, 23), start: 21, end: 23},
+	"unha 09/01 9h às 12h":         {related: true, mentionsChair: true, date: time.Date(2027, 1, 9, 0, 0, 0, 0, sp), start: 9, end: 12},
+	"o que tem agendado?":          {related: true, list: true},
+	"esquece":                      {related: true, cancel: true},
+	"bom dia, alguém viu a chave?": {},
+}
+
 func setup(t *testing.T, now time.Time) (*Handler, *fakeSite, *sent, *clock) {
 	t.Helper()
 	clk := &clock{t: now}
@@ -81,7 +105,8 @@ func setup(t *testing.T, now time.Time) (*Handler, *fakeSite, *sent, *clock) {
 	}
 	t.Cleanup(func() { store.Close() })
 	out := &sent{}
-	h := New(site, store, out, sp, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h := New(site, store, out, nil, sp, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	h.llm = &fakeLLM{answers: answers}
 	h.now = clk.now
 	h.pollEvery = time.Millisecond
 	return h, site, out, clk
@@ -113,6 +138,47 @@ func TestAsksUntilWhenThenBooksEverySlot(t *testing.T) {
 	}
 	if len(r) != 1 || !strings.Contains(r[0], "✅") || !strings.Contains(r[0], "sáb 28/11, 14h–18h") {
 		t.Fatalf("reply %q", r)
+	}
+}
+
+func TestShowsTheModelWhatWasAsked(t *testing.T) {
+	h, _, _, _ := setup(t, time.Date(2026, 11, 22, 10, 0, 0, 0, sp))
+	say(t, h, "unha sábado 15h")
+	say(t, h, "18h")
+	if q := h.llm.(*fakeLLM).questions; len(q) != 2 || q[1] != "Das 15h até que horas?" {
+		t.Fatalf("questions passed to the model: %q", q)
+	}
+}
+
+func TestNevermindDropsTheRequest(t *testing.T) {
+	h, site, _, _ := setup(t, time.Date(2026, 11, 22, 10, 0, 0, 0, sp))
+	say(t, h, "unha sábado 15h")
+	if r := say(t, h, "esquece"); len(r) != 1 || r[0] != "Ok, deixei pra lá." {
+		t.Fatalf("reply %q", r)
+	}
+	if r := say(t, h, "18h"); len(r) != 0 || len(site.booked) != 0 {
+		t.Fatalf("still booking after nevermind: %q %v", r, site.booked)
+	}
+}
+
+func TestSlotsCoverTheWholeRange(t *testing.T) {
+	cases := []struct {
+		start, end int
+		want       string
+	}{
+		{14, 18, "792,793"},
+		{15, 18, "792,793"}, // 15h falls in the 14–16 slot
+		{15, 16, "792"},
+		{6, 22, "788,789,790,791,792,793,794,795"},
+	}
+	for _, tc := range cases {
+		var ids []string
+		for _, s := range slotsFor(tc.start, tc.end) {
+			ids = append(ids, s.area.ID)
+		}
+		if got := strings.Join(ids, ","); got != tc.want {
+			t.Fatalf("%d-%d: got %s, want %s", tc.start, tc.end, got, tc.want)
+		}
 	}
 }
 
@@ -153,7 +219,7 @@ func TestSavesAFutureDateAndBooksItWhenItOpens(t *testing.T) {
 	if len(r) != 1 || !strings.Contains(r[0], "Anotado") || !strings.Contains(r[0], "qui 10/12") {
 		t.Fatalf("reply %q", r)
 	}
-	if r := say(t, h, "reservas"); !strings.Contains(r[0], "sáb 09/01, 9h–12h") {
+	if r := say(t, h, "o que tem agendado?"); !strings.Contains(r[0], "sáb 09/01, 9h–12h") {
 		t.Fatalf("list %q", r)
 	}
 

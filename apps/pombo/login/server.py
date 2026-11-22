@@ -16,6 +16,9 @@ _one_at_a_time = threading.Lock()
 def login() -> list[dict]:
     """Log in to the condo site and return the browser's cookies.
 
+    The emailed code can be read from the otp-relay Worker (README.md,
+    "Getting the emailed code").
+
     TODO: implement. Return context.cookies() after the browser reaches
     https://kpgadministrado.superlogica.net/clients/areadocondomino/...
     Raise an exception with a short reason on failure.

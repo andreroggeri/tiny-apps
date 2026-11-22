@@ -84,13 +84,20 @@ type draftKey struct{ chat, sender string }
 type draft struct {
 	day        time.Time
 	start, end int
+	question   string // what the bot last asked, so the LLM can read short answers
 	expires    time.Time
+}
+
+// interpreter reads a message; *LLM is the real one.
+type interpreter interface {
+	interpret(ctx context.Context, now time.Time, d *draft, question, text string) (parsed, error)
 }
 
 type Handler struct {
 	site  Site
 	store *Store
 	msg   Messenger
+	llm   interpreter
 	log   *slog.Logger
 	loc   *time.Location
 	now   func() time.Time
@@ -106,9 +113,9 @@ type Handler struct {
 	running map[int64]bool // pending requests being booked now
 }
 
-func New(site Site, store *Store, msg Messenger, loc *time.Location, log *slog.Logger) *Handler {
+func New(site Site, store *Store, msg Messenger, llm *LLM, loc *time.Location, log *slog.Logger) *Handler {
 	return &Handler{
-		site: site, store: store, msg: msg, log: log, loc: loc, now: time.Now,
+		site: site, store: store, msg: msg, llm: llm, log: log, loc: loc, now: time.Now,
 		pollEvery: 2 * time.Second, pollFor: 10 * time.Minute,
 		drafts: map[draftKey]*draft{}, checked: map[int64]bool{}, running: map[int64]bool{},
 	}
@@ -120,48 +127,66 @@ func (h *Handler) Handle(ctx context.Context, m router.Message) error {
 		return nil
 	}
 	now := h.now().In(h.loc)
-	switch simplify(text) {
-	case "reservas", "pendentes", "agendadas":
-		return h.listPending(ctx, m)
+	key := draftKey{m.ChatJID, m.SenderPhone}
+
+	var current *draft
+	h.mu.Lock()
+	if d := h.drafts[key]; d != nil && now.After(d.expires) {
+		delete(h.drafts, key)
+	} else if d != nil {
+		c := *d
+		current = &c
+	}
+	h.mu.Unlock()
+	question := ""
+	if current != nil {
+		question = current.question
 	}
 
-	key := draftKey{m.ChatJID, m.SenderPhone}
-	p := parse(text, now)
+	p, err := h.llm.interpret(ctx, now, current, question, text)
+	if err != nil {
+		return fmt.Errorf("não consegui ler a mensagem: %w", err)
+	}
+	switch {
+	case !p.related:
+		return nil // chatter, not for us
+	case p.list:
+		return h.listPending(ctx, m)
+	case p.cancel:
+		h.mu.Lock()
+		delete(h.drafts, key)
+		h.mu.Unlock()
+		if current == nil {
+			return nil
+		}
+		return m.Reply(ctx, "Ok, deixei pra lá.")
+	}
 
 	h.mu.Lock()
 	d := h.drafts[key]
-	if d != nil && now.After(d.expires) {
-		d = nil
-		delete(h.drafts, key)
-	}
 	switch {
 	case p.mentionsChair:
 		d = &draft{day: p.date, start: p.start, end: p.end}
 	case d == nil:
 		h.mu.Unlock()
-		return nil // chatter, not for us
-	case isNevermind(text):
-		delete(h.drafts, key)
-		h.mu.Unlock()
-		return m.Reply(ctx, "Ok, deixei pra lá.")
+		return nil // an answer to a question that expired
 	default:
 		d.merge(p)
 	}
 	d.expires = now.Add(draftTTL)
-	h.drafts[key] = d
-
-	var question string
+	d.question = ""
 	switch {
 	case d.day.IsZero():
-		question = "Pra qual dia? (ex.: sábado, 05/12)"
+		d.question = "Pra qual dia? (ex.: sábado, 05/12)"
 	case d.start == 0:
-		question = "A partir de que horas?"
+		d.question = "A partir de que horas?"
 	case d.end == 0:
-		question = fmt.Sprintf("Das %dh até que horas?", d.start)
+		d.question = fmt.Sprintf("Das %dh até que horas?", d.start)
 	}
-	if question != "" {
+	if d.question != "" {
+		h.drafts[key] = d
 		h.mu.Unlock()
-		return m.Reply(ctx, question)
+		return m.Reply(ctx, d.question)
 	}
 	delete(h.drafts, key)
 	h.mu.Unlock()
@@ -173,39 +198,17 @@ func (h *Handler) Handle(ctx context.Context, m router.Message) error {
 	return h.request(ctx, m, req, now)
 }
 
-// merge fills in what an answer adds. A lone time answers whatever was asked:
-// "18h" after "até que horas?" is the end.
+// merge fills in what an answer adds.
 func (d *draft) merge(p parsed) {
 	if !p.date.IsZero() {
 		d.day = p.date
 	}
-	switch {
-	case p.start != 0 && p.end != 0:
-		d.start, d.end = p.start, p.end
-	case p.end != 0:
-		d.end = p.end
-		if p.start != 0 {
-			d.start = p.start
-		}
-	case p.start != 0 && d.start != 0 && d.end == 0:
-		d.end = p.start
-	case p.start != 0:
+	if p.start != 0 {
 		d.start = p.start
-	case p.bareHour != 0 && d.start != 0 && d.end == 0:
-		d.end = p.bareHour
-	case p.bareHour != 0 && d.start == 0 && !d.day.IsZero():
-		d.start = p.bareHour
 	}
-}
-
-func isNevermind(text string) bool {
-	s := simplify(text)
-	for _, w := range []string{"cancela", "deixa", "esquece", "nada"} {
-		if strings.HasPrefix(s, w) {
-			return true
-		}
+	if p.end != 0 {
+		d.end = p.end
 	}
-	return false
 }
 
 func (h *Handler) validate(r request, now time.Time) string {

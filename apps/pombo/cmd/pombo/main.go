@@ -138,12 +138,15 @@ func run(log *slog.Logger) error {
 	}
 	defer pending.Close()
 	sender := &lateSender{}
-	booker := reservas.New(site, pending, sender, saoPaulo, log)
-
-	rt := router.New(store, map[string]router.Handler{
-		documents.Name: docs,
-		reservas.Name:  booker,
-	}, log)
+	handlers := map[string]router.Handler{documents.Name: docs}
+	var booker *reservas.Handler
+	if cfg.LLMURL != "" {
+		booker = reservas.New(site, pending, sender, reservas.NewLLM(cfg.LLMURL, cfg.LLMModel), saoPaulo, log)
+		handlers[reservas.Name] = booker
+	} else {
+		log.Warn("LLM_URL not set: reservas handler disabled, it needs the LLM to read messages")
+	}
+	rt := router.New(store, handlers, log)
 
 	wa, err := whatsapp.New(ctx, filepath.Join(cfg.DataDir, "whatsapp.db"), rt.Dispatch, log)
 	if err != nil {
@@ -154,7 +157,9 @@ func run(log *slog.Logger) error {
 	}
 	defer wa.Stop()
 	sender.wa = wa
-	go booker.Run(ctx)
+	if booker != nil {
+		go booker.Run(ctx)
+	}
 	go site.KeepAlive(ctx, 5*time.Minute)
 
 	mux := http.NewServeMux()
