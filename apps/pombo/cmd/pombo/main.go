@@ -17,11 +17,15 @@ import (
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/dash"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/grouping"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/handlers/documents"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/handlers/reservas"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/notify"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/paperless"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/router"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/settings"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/superlogica"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/whatsapp"
+
+	_ "time/tzdata" // the image has no zoneinfo; reservas needs America/Sao_Paulo
 )
 
 // sentByField is the paperless custom field recording who sent a document,
@@ -36,6 +40,12 @@ type config struct {
 	LLMURL         string // OpenAI-compatible API with image input; "" disables grouping
 	LLMModel       string
 	NotifyToken    string // bearer token coruja sends to /notify; "" disables it
+
+	// Condo bookings (reservas handler).
+	SuperlogicaURL      string
+	SuperlogicaCondoID  string
+	SuperlogicaUnitID   string
+	SuperlogicaLoginURL string // login service; "" = sessions are pasted in the dashboard
 }
 
 func loadConfig() (config, error) {
@@ -47,6 +57,11 @@ func loadConfig() (config, error) {
 		LLMURL:         os.Getenv("LLM_URL"),
 		LLMModel:       os.Getenv("LLM_MODEL"),
 		NotifyToken:    os.Getenv("NOTIFY_TOKEN"),
+
+		SuperlogicaURL:      getenv("SUPERLOGICA_URL", "https://kpgadministrado.superlogica.net"),
+		SuperlogicaCondoID:  getenv("SUPERLOGICA_CONDO_ID", "58"),
+		SuperlogicaUnitID:   getenv("SUPERLOGICA_UNIT_ID", "6471"),
+		SuperlogicaLoginURL: os.Getenv("SUPERLOGICA_LOGIN_URL"),
 	}
 	if c.PaperlessURL == "" || c.PaperlessToken == "" {
 		return c, errors.New("PAPERLESS_URL and PAPERLESS_TOKEN are required")
@@ -101,8 +116,33 @@ func run(log *slog.Logger) error {
 	if docs.SentByField, err = pl.CustomFieldID(ctx, sentByField); err != nil {
 		log.Warn("not recording who sent documents", "err", err)
 	}
+	condo, err := superlogica.New(cfg.SuperlogicaURL, cfg.SuperlogicaCondoID, cfg.SuperlogicaUnitID,
+		filepath.Join(cfg.DataDir, "superlogica-session.json"))
+	if err != nil {
+		return err
+	}
+	var login superlogica.Login = superlogica.NoLogin{}
+	if cfg.SuperlogicaLoginURL != "" {
+		login = superlogica.NewHTTPLogin(cfg.SuperlogicaLoginURL)
+	} else {
+		log.Warn("SUPERLOGICA_LOGIN_URL not set: condo sessions must be pasted in the dashboard")
+	}
+	site := superlogica.NewSite(condo, login, log)
+	saoPaulo, err := time.LoadLocation("America/Sao_Paulo")
+	if err != nil {
+		return err
+	}
+	pending, err := reservas.OpenStore(ctx, filepath.Join(cfg.DataDir, "reservas.db"), saoPaulo)
+	if err != nil {
+		return fmt.Errorf("open reservas store: %w", err)
+	}
+	defer pending.Close()
+	sender := &lateSender{}
+	booker := reservas.New(site, pending, sender, saoPaulo, log)
+
 	rt := router.New(store, map[string]router.Handler{
 		documents.Name: docs,
+		reservas.Name:  booker,
 	}, log)
 
 	wa, err := whatsapp.New(ctx, filepath.Join(cfg.DataDir, "whatsapp.db"), rt.Dispatch, log)
@@ -113,9 +153,12 @@ func run(log *slog.Logger) error {
 		return fmt.Errorf("start whatsapp: %w", err)
 	}
 	defer wa.Stop()
+	sender.wa = wa
+	go booker.Run(ctx)
+	go site.KeepAlive(ctx, 5*time.Minute)
 
 	mux := http.NewServeMux()
-	mux.Handle("/", dash.New(wa, store, rt.HandlerNames(), log).Handler())
+	mux.Handle("/", dash.New(wa, store, rt.HandlerNames(), log).WithSuperlogica(condo).Handler())
 	mux.Handle("POST /notify", notify.New(wa, store, cfg.NotifyToken, documents.Name, log))
 
 	srv := &http.Server{
@@ -139,4 +182,15 @@ func run(log *slog.Logger) error {
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)
 	return err
+}
+
+// lateSender lets the reservas handler post to groups; the WhatsApp client
+// it needs is created after the handler.
+type lateSender struct{ wa *whatsapp.Client }
+
+func (l *lateSender) Send(ctx context.Context, chatJID, text string) error {
+	if l.wa == nil {
+		return errors.New("whatsapp not started")
+	}
+	return l.wa.Send(ctx, chatJID, text)
 }

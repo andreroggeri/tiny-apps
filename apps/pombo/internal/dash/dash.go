@@ -7,15 +7,18 @@ import (
 	"context"
 	"embed"
 	"encoding/base64"
+	"encoding/json"
 	"html/template"
 	"log/slog"
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	qrcode "github.com/skip2/go-qrcode"
 
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/settings"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/superlogica"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/whatsapp"
 )
 
@@ -37,7 +40,14 @@ type Settings interface {
 	RemoveSender(ctx context.Context, phone string) error
 }
 
+// Superlogica is the condo-site session used by the reservas handler.
+type Superlogica interface {
+	Alive(ctx context.Context) error
+	SetSession(cookies []superlogica.Cookie) error
+}
+
 type Server struct {
+	condo    Superlogica // nil hides the condo section
 	wa       WhatsApp
 	settings Settings
 	handlers []string
@@ -48,12 +58,20 @@ func New(wa WhatsApp, s Settings, handlerNames []string, log *slog.Logger) *Serv
 	return &Server{wa: wa, settings: s, handlers: handlerNames, log: log}
 }
 
+// WithSuperlogica adds the condo-site session section, where a session can
+// be pasted when no login service is set up.
+func (s *Server) WithSuperlogica(c Superlogica) *Server {
+	s.condo = c
+	return s
+}
+
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", s.index)
 	mux.HandleFunc("POST /routes", s.setRoute)
 	mux.HandleFunc("POST /senders", s.addSender)
 	mux.HandleFunc("POST /senders/delete", s.removeSender)
+	mux.HandleFunc("POST /superlogica/session", s.setCondoSession)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte("ok")) })
 	return mux
 }
@@ -70,6 +88,10 @@ type pageData struct {
 	Handlers []string
 	Senders  []settings.Sender
 	Error    string
+
+	CondoShown bool
+	CondoOK    bool
+	CondoErr   string
 }
 
 func (s *Server) index(w http.ResponseWriter, r *http.Request) {
@@ -91,6 +113,17 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 
 	if data.Senders, err = s.settings.Senders(ctx); err != nil {
 		data.Error = err.Error()
+	}
+
+	if s.condo != nil {
+		data.CondoShown = true
+		cctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		if err := s.condo.Alive(cctx); err != nil {
+			data.CondoErr = err.Error()
+		} else {
+			data.CondoOK = true
+		}
+		cancel()
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -153,6 +186,21 @@ func (s *Server) addSender(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) removeSender(w http.ResponseWriter, r *http.Request) {
 	s.saveAndRedirect(w, r, s.settings.RemoveSender(r.Context(), r.FormValue("phone")))
+}
+
+// setCondoSession takes a JSON cookie list (Playwright's context.cookies()
+// shape) for the condo site.
+func (s *Server) setCondoSession(w http.ResponseWriter, r *http.Request) {
+	if s.condo == nil {
+		http.NotFound(w, r)
+		return
+	}
+	var cookies []superlogica.Cookie
+	if err := json.Unmarshal([]byte(r.FormValue("cookies")), &cookies); err != nil {
+		http.Error(w, "not a JSON cookie list: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	s.saveAndRedirect(w, r, s.condo.SetSession(cookies))
 }
 
 func (s *Server) saveAndRedirect(w http.ResponseWriter, r *http.Request, err error) {

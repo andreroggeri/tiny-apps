@@ -23,7 +23,7 @@
   td { padding:8px 4px; border-top:1px solid var(--line); vertical-align:middle; }
   tr:first-child td { border-top:0; }
   form.inline { display:flex; gap:8px; align-items:center; margin:0; flex-wrap:wrap; }
-  input, select, button { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); }
+  input, select, button, textarea { font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); }
   button { cursor:pointer; }
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
   .qr { background:#fff; padding:12px; border-radius:8px; display:inline-block; }
@@ -104,6 +104,18 @@
       <button class="primary" type="submit">Adicionar</button>
     </form>
   </section>
+  {{if .CondoShown}}
+  <section>
+    <h2>Condomínio (reservas)</h2>
+    {{if .CondoOK}}<p><span class="ok">Login ativo</span></p>
+    {{else}}<p><span class="warn">Sem login</span> <span class="muted">{{.CondoErr}}</span></p>{{end}}
+    <form method="post" action="/superlogica/session">
+      <p class="muted">Cole os cookies de uma sessão logada (lista JSON, formato do Playwright <code>context.cookies()</code>).</p>
+      <textarea name="cookies" rows="4" style="width:100%;font:12px monospace" aria-label="Cookies" required></textarea>
+      <button class="primary" type="submit">Salvar sessão</button>
+    </form>
+  </section>
+  {{end}}
 </main>
 </body>
 </html>

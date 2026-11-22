@@ -6,6 +6,7 @@ each group is routed to a handler:
 | Handler | What it does |
 |---|---|
 | `documents` | Files photos and PDFs in paperless-ngx (details below). |
+| `reservas` | Books the condo's manicure chair (details below). |
 
 It connects as a linked device of a spare WhatsApp number (via
 [whatsmeow](https://github.com/tulir/whatsmeow)), so it's unofficial: use a
@@ -38,6 +39,27 @@ number you can afford to lose, never a personal one.
   document and calls `POST /notify`; pombo posts title, summary, sender and
   link in every group routed to `documents`.
 
+## Reservas handler
+
+- **Ask in plain Portuguese:** "unha sábado 15h às 18h", "manicure 05/12 das
+  14 às 16h". If the day, start or end is missing, the bot asks ("Das 15h até
+  que horas?") and waits 15 minutes for the answer. "cancela" drops it.
+- **Whole range:** the chair is booked in 2-hour slots (6h–22h), so every slot
+  touching the range is booked: 15h–18h takes 14–16 and 16–18.
+- **Partial results stay:** slots that couldn't be booked are listed with the
+  site's reason; the booked ones are kept.
+- **Dates not open yet:** a date opens 30 days ahead at midnight. Requests for
+  later dates are saved, tried every 2 s from just before midnight for 10
+  minutes, and the result is posted in the group. "reservas" lists them. The
+  session is checked 30 minutes before; if it's dead, the group is told.
+- **Login:** the site's login (email + emailed code, behind reCAPTCHA) is not
+  done by pombo. A session comes from a separate login service
+  (`SUPERLOGICA_LOGIN_URL`, contract in [login/README.md](login/README.md); not
+  implemented yet) or is pasted in the dashboard. Pombo checks it every 5
+  minutes, which keeps it from idling out, and logs how long each one lasted.
+- **Test a session:** `go run ./cmd/superlogica-check -session cookies.json`
+  (add `-book 788 -date YYYY-MM-DD` to book and cancel a slot).
+
 ## Dashboard
 
 One page on `:8080` to pair the number (QR code), route groups to handlers and
@@ -55,6 +77,9 @@ ingress SSO.
 | `PAPERLESS_TOKEN` | — | API token of the paperless account documents are uploaded as. Needs add/view/delete document, add note and view custom field. |
 | `LLM_URL` | — | OpenAI-compatible API with image input (e.g. llama.cpp), used to group photos. Unset: no grouping. |
 | `LLM_MODEL` | — | Model name, exactly as the server lists it |
+| `SUPERLOGICA_URL` | `https://kpgadministrado.superlogica.net` | Condo site |
+| `SUPERLOGICA_CONDO_ID` / `SUPERLOGICA_UNIT_ID` | `58` / `6471` | Condo and apartment on the site |
+| `SUPERLOGICA_LOGIN_URL` | — | Login service that returns a session. Unset: paste sessions in the dashboard. |
 | `NOTIFY_TOKEN` | — | Bearer token coruja sends to `POST /notify`. Unset: the endpoint refuses everything. |
 
 ## Develop
