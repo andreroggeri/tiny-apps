@@ -4,6 +4,14 @@ Pombo books with a logged-in session but doesn't log in itself. When the
 session is missing or expired, it asks this service for a new one. Until the
 service exists, a session can be pasted in the dashboard instead.
 
+The service is `cmd/superlogica-login`, a separate Go binary so the browser it
+needs stays out of pombo's image. Its HTTP server and the code lookup
+(`waitForCode`) are done; `login()` is the part left to write. Run it with:
+
+```sh
+SUPERLOGICA_EMAIL=... OTP_RELAY_TOKEN=... go run ./cmd/superlogica-login
+```
+
 The site's login is email + a code sent by email, at
 `sso.superlogica.com` (realm `superlogica-cloud`, client
 `cloud_areadocondomino`). After it, the browser lands on
@@ -26,8 +34,7 @@ The site's login is email + a code sent by email, at
   emailed code.
 - On failure, answer non-200 with a short plain-text reason. Pombo logs it and
   tells the group a login is needed.
-- Handle one login at a time. Pombo never sends two at once, but a second
-  call while one is running should wait or fail, not start a parallel login.
+- Handle one login at a time (the stub answers 409 to a second call).
 
 ## Getting the emailed code
 
@@ -45,11 +52,12 @@ Authorization: Bearer <token>
 - `200` with `{"code": "482913", "from": "...", "subject": "...", "receivedAt": 1795..., "text": "..."}`.
   `code` is `null` if no 4–9 digit number was found; read `text` then.
 - Token: `pulumi stack output otpRelayToken --show-secrets` (infrastructure
-  repo). Give it to the service as an env var, never in code.
+  repo). The service reads it from `OTP_RELAY_TOKEN`, never from code.
+- `waitForCode(ctx, cfg, askedAt)` in the stub already does this polling.
 
 ## How to validate
 
-1. Run the service locally, then:
+1. Run the service locally (above), then:
 
    ```sh
    go run ./cmd/superlogica-check -login-url http://localhost:8000/login
