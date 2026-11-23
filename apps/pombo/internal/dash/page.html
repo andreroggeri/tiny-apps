@@ -111,7 +111,7 @@
     {{else}}<p><span class="warn">Sem login</span> <span class="muted">{{.CondoErr}}</span></p>{{end}}
     <form method="post" action="/superlogica/session">
       <p class="muted">Cole os cookies de uma sessão logada (lista JSON, formato do Playwright <code>context.cookies()</code>).
-        Inclua os <strong>dois</strong> domínios, <code>kpgadministrado.superlogica.net</code> e
+        Inclua os <strong>dois</strong> domínios, <code>your-condo.superlogica.net</code> e
         <code>sso.superlogica.com</code>: sem os cookies do segundo, a sessão funciona até expirar e depois não renova.</p>
       <textarea name="cookies" rows="4" style="width:100%;font:12px monospace" aria-label="Cookies" required></textarea>
       <button class="primary" type="submit">Salvar sessão</button>

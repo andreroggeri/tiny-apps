@@ -19,7 +19,7 @@ It doesn't have to. The login is two sessions, not one:
 
 | Session | Where | Lives |
 |---|---|---|
-| App session (`PHPSESSID`) | `kpgadministrado.superlogica.net` | short |
+| App session (`PHPSESSID`) | `your-condo.superlogica.net` | short |
 | Keycloak SSO session | `sso.superlogica.com` | much longer |
 
 Only the **app** session is what keeps expiring. Opening the condo site with
@@ -60,7 +60,7 @@ For the hand tool, `cmd/superlogica-login`:
 | Env | Default | What |
 |---|---|---|
 | `LISTEN` | `:8000` | address to serve on |
-| `SUPERLOGICA_URL` | `https://kpgadministrado.superlogica.net` | condo site |
+| `SUPERLOGICA_URL` | — | condo site (required) |
 | `SUPERLOGICA_SSO_HOST` | `sso.superlogica.com` | Keycloak host |
 | `SUPERLOGICA_SESSION_PATH` | `superlogica-session.json` | the session file |
 | `OTP_RELAY_URL` / `OTP_RELAY_TOKEN` / `SUPERLOGICA_EMAIL` | — | only for the unused emailed-code path; see `OTP-RELAY.md` |
@@ -72,7 +72,7 @@ session ever expires.
 
 1. Log in to the condo site in a browser, the normal way (email + emailed
    code).
-2. Export the cookies for **both** `kpgadministrado.superlogica.net` and
+2. Export the cookies for **both** `your-condo.superlogica.net` and
    `sso.superlogica.com` as a JSON list in the shape above.
    The easiest export is **Copy as cURL**: with DevTools on the Network tab,
    load `https://sso.superlogica.com/auth/realms/superlogica-cloud/account/`,
@@ -117,7 +117,7 @@ that fetched it still exists and is now dead weight —
    out:
 
    ```sh
-   go run ./cmd/superlogica-check -login-url http://localhost:8000/login -book 788 -date 2026-12-20
+   go run ./cmd/superlogica-check -login-url http://localhost:8000/login -book <area-id> -date YYYY-MM-DD
    ```
 
 3. Deploy pombo, make sure the saved session covers both hosts, and watch for

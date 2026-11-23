@@ -10,14 +10,14 @@ when you sign in.
 | Piece | Where |
 |---|---|
 | Gmail filter on Superlógica's code emails | Gmail, the condo account |
-| Forwarding to `otp-superlogica@roggeri.com.br` | Gmail forwarding (verified) |
+| Forwarding to a dedicated mailbox | Gmail forwarding (verified) |
 | Worker `otp-relay`, keeps the latest code 10 min | infrastructure repo, `pulumi/homelab/otp-relay` |
-| Endpoint `https://otp.roggeri.com.br/codes/superlogica` | Cloudflare, DNS on `roggeri.com.br` |
+| Endpoint `https://<otp-relay-host>/codes/superlogica` | Cloudflare, DNS on the personal domain |
 | Bearer token | `pulumi stack output otpRelayToken --show-secrets` |
 | Client `waitForCode` | `cmd/superlogica-login/main.go` |
 
 ```
-GET https://otp.roggeri.com.br/codes/superlogica?since=<epoch ms>
+GET https://<otp-relay-host>/codes/superlogica?since=<epoch ms>
 Authorization: Bearer <token>
   404  no email after `since` yet; poll every 2–3 s
   200  {"code":"482913","from":...,"subject":...,"receivedAt":...,"text":...}
@@ -78,7 +78,7 @@ In this repo:
 In the infrastructure repo (**not checked from here — verify before deleting**):
 
 4. Remove the `otp-relay` component under `pulumi/homelab/`, then `pulumi up`.
-   Check what it owns besides the Worker: the `otp.roggeri.com.br` DNS record,
+   Check what it owns besides the Worker: the relay's DNS record,
    any KV namespace or Durable Object holding the codes, and the
    `otpRelayToken` secret.
 5. Remove `OTP_RELAY_TOKEN` from pombo's sealed secret if it was ever added.
@@ -86,7 +86,7 @@ In the infrastructure repo (**not checked from here — verify before deleting**
 In Gmail:
 
 6. Delete the filter on Superlógica's code emails.
-7. Remove the forwarding address `otp-superlogica@roggeri.com.br`.
+7. Remove the forwarding address a dedicated mailbox.
 
 Then add a line to `apps/pombo/DECISIONS.md`.
 

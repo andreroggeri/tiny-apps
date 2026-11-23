@@ -29,7 +29,7 @@ site keeps two sessions and only the short one expires:
 
 | Session | Host | Lives |
 |---|---|---|
-| `PHPSESSID` | `kpgadministrado.superlogica.net` | short |
+| `PHPSESSID` | `your-condo.superlogica.net` | short |
 | Keycloak SSO | `sso.superlogica.com` | much longer |
 
 Opening the condo site with the Keycloak cookies attached makes the OIDC
@@ -52,8 +52,8 @@ which isn't a road worth taking for a condo booking bot.
   silent re-auth.
 - `superlogica-check` against the renewal: `OK: session is logged in`, 14
   cookies in 3 s.
-- A real booking went through: slot 788 (06–08h) on 2026-11-25, reservation
-  `30150`, queue 1, confirmed in the portal and left for André to cancel.
+- A real booking went through on an early-morning slot, confirmed in the
+  portal, then cancelled.
 - The saved session after a renewal holds 3 condo cookies and 11 Keycloak
   ones, so it is self-sustaining.
 
@@ -61,8 +61,10 @@ which isn't a road worth taking for a condo booking bot.
 
 1. Merge PR #1. CI publishes `ghcr.io/andreroggeri/tiny-apps/pombo:sha-<commit>`.
 2. In the infrastructure repo, `k3s/applications/pombo/values.yaml`: bump
-   `image.tag`. Nothing else — no sidecar, no second image, no extra volume,
-   no `SUPERLOGICA_LOGIN_URL`.
+   `image.tag`, and set `SUPERLOGICA_URL`, `SUPERLOGICA_CONDO_ID` and
+   `SUPERLOGICA_UNIT_ID` — **they no longer have defaults in the repo and
+   pombo now refuses to start without them.** Nothing else: no sidecar, no
+   second image, no extra volume, no `SUPERLOGICA_LOGIN_URL`.
 3. `cd k3s && helmfile -l name=pombo --skip-deps sync`
 4. Seed the session: log in by hand and paste the cookies for **both** hosts
    into the dashboard's "Condomínio" box. A paste without the
@@ -104,8 +106,10 @@ the returned code is thrown away.
 
 ## Site facts
 
-- Condo `58`, unit `6471`.
-- Manicure chair: one area ID per 2-hour slot, 788 (06–08h) to 795 (20–22h).
+- Condo and unit IDs are deployment config (`SUPERLOGICA_CONDO_ID`,
+  `SUPERLOGICA_UNIT_ID`), deliberately not in this repo.
+- Manicure chair: one area ID per 2-hour slot, eight slots from 06h to 22h.
+  The IDs are contiguous; read them off the booking page.
 - Dates open 30 days ahead at 00:00 São Paulo time; earliest is tomorrow.
 - Booking and cancel requests: `internal/superlogica/client.go`.
 - The login page runs reCAPTCHA Enterprise (site key in the page source) and

@@ -46,13 +46,13 @@ func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	cfg := config{
 		Listen:      getenv("LISTEN", ":8000"),
-		Base:        getenv("SUPERLOGICA_URL", "https://kpgadministrado.superlogica.net"),
-		CondoID:     getenv("SUPERLOGICA_CONDO_ID", "58"),
-		UnitID:      getenv("SUPERLOGICA_UNIT_ID", "6471"),
+		Base:        os.Getenv("SUPERLOGICA_URL"),
+		CondoID:     os.Getenv("SUPERLOGICA_CONDO_ID"),
+		UnitID:      os.Getenv("SUPERLOGICA_UNIT_ID"),
 		SSOHost:     getenv("SUPERLOGICA_SSO_HOST", superlogica.DefaultSSOHost),
 		SessionPath: getenv("SUPERLOGICA_SESSION_PATH", "superlogica-session.json"),
 		Email:       os.Getenv("SUPERLOGICA_EMAIL"),
-		OTPURL:      getenv("OTP_RELAY_URL", "https://otp.roggeri.com.br/codes/superlogica"),
+		OTPURL:      os.Getenv("OTP_RELAY_URL"),
 		OTPToken:    os.Getenv("OTP_RELAY_TOKEN"),
 		OTPTimeout:  3 * time.Minute,
 	}
@@ -67,6 +67,10 @@ func main() {
 		return
 	}
 
+	if cfg.Base == "" || cfg.CondoID == "" || cfg.UnitID == "" {
+		log.Error("SUPERLOGICA_URL, SUPERLOGICA_CONDO_ID and SUPERLOGICA_UNIT_ID are required")
+		os.Exit(1)
+	}
 	client, err := superlogica.New(cfg.Base, cfg.CondoID, cfg.UnitID, cfg.SessionPath)
 	if err != nil {
 		log.Error("cannot open the saved session", "err", err)

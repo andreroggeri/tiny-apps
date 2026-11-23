@@ -81,7 +81,7 @@ type Client struct {
 const userAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
 
 // New returns a client for the condo site at base (e.g.
-// https://kpgadministrado.superlogica.net). A session saved at sessionPath
+// https://your-condo.superlogica.net). A session saved at sessionPath
 // by an earlier run is loaded; a missing file just means no session yet.
 func New(base, condoID, unitID, sessionPath string) (*Client, error) {
 	u, err := url.Parse(strings.TrimRight(base, "/"))

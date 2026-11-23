@@ -99,8 +99,8 @@ func (f *fakeCondo) SetSession(c []superlogica.Cookie) error {
 }
 
 func TestCondoSessionPasteNeedsBothDomains(t *testing.T) {
-	appOnly := `[{"name":"PHPSESSID","value":"x","domain":"kpgadministrado.superlogica.net","path":"/"}]`
-	bothHosts := `[{"name":"PHPSESSID","value":"x","domain":"kpgadministrado.superlogica.net","path":"/"},
+	appOnly := `[{"name":"PHPSESSID","value":"x","domain":"your-condo.superlogica.net","path":"/"}]`
+	bothHosts := `[{"name":"PHPSESSID","value":"x","domain":"your-condo.superlogica.net","path":"/"},
 	               {"name":"KEYCLOAK_IDENTITY","value":"y","domain":"sso.superlogica.com","path":"/"}]`
 
 	for _, tc := range []struct {

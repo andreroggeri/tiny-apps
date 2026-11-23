@@ -58,9 +58,9 @@ func loadConfig() (config, error) {
 		LLMModel:       os.Getenv("LLM_MODEL"),
 		NotifyToken:    os.Getenv("NOTIFY_TOKEN"),
 
-		SuperlogicaURL:      getenv("SUPERLOGICA_URL", "https://kpgadministrado.superlogica.net"),
-		SuperlogicaCondoID:  getenv("SUPERLOGICA_CONDO_ID", "58"),
-		SuperlogicaUnitID:   getenv("SUPERLOGICA_UNIT_ID", "6471"),
+		SuperlogicaURL:      os.Getenv("SUPERLOGICA_URL"),
+		SuperlogicaCondoID:  os.Getenv("SUPERLOGICA_CONDO_ID"),
+		SuperlogicaUnitID:   os.Getenv("SUPERLOGICA_UNIT_ID"),
 		SuperlogicaLoginURL: os.Getenv("SUPERLOGICA_LOGIN_URL"),
 	}
 	if c.PaperlessURL == "" || c.PaperlessToken == "" {
@@ -68,6 +68,11 @@ func loadConfig() (config, error) {
 	}
 	if c.LLMURL != "" && c.LLMModel == "" {
 		return c, errors.New("LLM_MODEL is required when LLM_URL is set")
+	}
+	// Deliberately not defaulted: which condo and unit these are is nobody's
+	// business but the deployment's, so they stay out of the repo.
+	if c.SuperlogicaURL == "" || c.SuperlogicaCondoID == "" || c.SuperlogicaUnitID == "" {
+		return c, errors.New("SUPERLOGICA_URL, SUPERLOGICA_CONDO_ID and SUPERLOGICA_UNIT_ID are required")
 	}
 	return c, nil
 }

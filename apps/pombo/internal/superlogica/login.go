@@ -33,7 +33,7 @@ func (NoLogin) Login(context.Context) ([]Cookie, error) { return nil, ErrNoLogin
 // (logging in includes waiting for the emailed code). The service answers
 // 200 with a JSON array of cookies, in Playwright's context.cookies() shape:
 //
-//	[{"name":"PHPSESSID","value":"...","domain":"kpgadministrado.superlogica.net","path":"/"}, ...]
+//	[{"name":"PHPSESSID","value":"...","domain":"your-condo.superlogica.net","path":"/"}, ...]
 //
 // Anything else is a failed login; the body is shown in the logs.
 type HTTPLogin struct {

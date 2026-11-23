@@ -77,7 +77,7 @@ func TestBookSendsTheSitesRequest(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c, _ := New(srv.URL, "58", "6471", "")
+	c, _ := New(srv.URL, "1", "2", "")
 	host, _ := url.Parse(srv.URL)
 	c.SetSession([]Cookie{{Name: "PHPSESSID", Value: "abc", Domain: host.Hostname(), Path: "/"}})
 	r, err := c.Book(context.Background(), Area{ID: "792", Name: "CADEIRA - 14h às 16h"}, time.Date(2026, 12, 5, 0, 0, 0, 0, time.UTC))
@@ -85,8 +85,8 @@ func TestBookSendsTheSitesRequest(t *testing.T) {
 		t.Fatalf("got %+v, %v", r, err)
 	}
 	for k, want := range map[string]string{
-		"ID_AREA_ARE": "792", "DT_RESERVA_RES": "12/05/2026 00:00:00", "ID_UNIDADE_UNI": "6471",
-		"ID_CONDOMINIO_COND": "58", "nomeArea": "CADEIRA - 14h às 16h", "FL_REGRAS_ARE": "1",
+		"ID_AREA_ARE": "792", "DT_RESERVA_RES": "12/05/2026 00:00:00", "ID_UNIDADE_UNI": "2",
+		"ID_CONDOMINIO_COND": "1", "nomeArea": "CADEIRA - 14h às 16h", "FL_REGRAS_ARE": "1",
 	} {
 		if got[k] != want {
 			t.Errorf("%s = %q, want %q", k, got[k], want)
@@ -109,7 +109,7 @@ func TestAliveSpotsTheLoginRedirect(t *testing.T) {
 	}))
 	defer site.Close()
 
-	c, _ := New(site.URL, "58", "6471", filepath.Join(t.TempDir(), "session.json"))
+	c, _ := New(site.URL, "1", "2", filepath.Join(t.TempDir(), "session.json"))
 	if err := c.Alive(context.Background()); !errors.Is(err, ErrSessionExpired) {
 		t.Fatalf("no session: got %v", err)
 	}
@@ -125,11 +125,11 @@ func TestAliveSpotsTheLoginRedirect(t *testing.T) {
 
 func TestSessionSurvivesRestart(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "session.json")
-	c, _ := New("https://example.test", "58", "6471", path)
+	c, _ := New("https://example.test", "1", "2", path)
 	if err := c.SetSession([]Cookie{{Name: "PHPSESSID", Value: "x", Domain: "example.test"}}); err != nil {
 		t.Fatal(err)
 	}
-	c2, err := New("https://example.test", "58", "6471", path)
+	c2, err := New("https://example.test", "1", "2", path)
 	if err != nil || !c2.HasSession() {
 		t.Fatalf("session not reloaded: %v", err)
 	}
@@ -152,7 +152,7 @@ func TestEnsureSessionLogsInOnlyWhenExpired(t *testing.T) {
 		w.Write([]byte("login"))
 	}))
 	defer site.Close()
-	c, _ := New(site.URL, "58", "6471", "")
+	c, _ := New(site.URL, "1", "2", "")
 
 	if err := c.EnsureSession(context.Background(), NoLogin{}); !errors.Is(err, ErrSessionExpired) {
 		t.Fatalf("no login service: got %v", err)

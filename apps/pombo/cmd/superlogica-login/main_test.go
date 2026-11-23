@@ -97,14 +97,14 @@ func TestSeedSessionRejectsACurlForTheWrongHost(t *testing.T) {
 	dir := t.TempDir()
 	// The condo site never sees the Keycloak cookies; this is the easy mistake.
 	from := writeFile(t, dir, "curl.txt",
-		`curl 'https://kpgadministrado.superlogica.net/areadocondomino/atual/cobranca/index' `+
+		`curl 'https://your-condo.superlogica.net/areadocondomino/atual/cobranca/index' `+
 			`-H 'Cookie: PHPSESSID=app; server-id=3'`)
 
 	_, err := seedSession(from, filepath.Join(dir, "session.json"), "sso.superlogica.com")
 	if err == nil {
 		t.Fatal("want an error naming the wrong host")
 	}
-	for _, want := range []string{"kpgadministrado.superlogica.net", "sso.superlogica.com"} {
+	for _, want := range []string{"your-condo.superlogica.net", "sso.superlogica.com"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error %q doesn't mention %s", err, want)
 		}
@@ -115,7 +115,7 @@ func TestSeedSessionKeepsOnlyTheKeycloakCookiesFromJSON(t *testing.T) {
 	dir := t.TempDir()
 	to := filepath.Join(dir, "session.json")
 	from := writeFile(t, dir, "browser.json", `[
-		{"name":"PHPSESSID","value":"app","domain":"kpgadministrado.superlogica.net","path":"/"},
+		{"name":"PHPSESSID","value":"app","domain":"your-condo.superlogica.net","path":"/"},
 		{"name":"KEYCLOAK_IDENTITY","value":"id","domain":"sso.superlogica.com","path":"/"},
 		{"name":"KEYCLOAK_SESSION","value":"sess","domain":".sso.superlogica.com","path":"/"}
 	]`)
@@ -132,7 +132,7 @@ func TestSeedSessionKeepsOnlyTheKeycloakCookiesFromJSON(t *testing.T) {
 
 	// A browser export of only the condo domain is a mistake worth naming.
 	onlyApp := writeFile(t, dir, "onlyapp.json",
-		`[{"name":"PHPSESSID","value":"app","domain":"kpgadministrado.superlogica.net","path":"/"}]`)
+		`[{"name":"PHPSESSID","value":"app","domain":"your-condo.superlogica.net","path":"/"}]`)
 	if _, err := seedSession(onlyApp, to, "sso.superlogica.com"); err == nil || !strings.Contains(err.Error(), "both domains") {
 		t.Errorf("got %v, want a message about exporting both domains", err)
 	}

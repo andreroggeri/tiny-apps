@@ -79,8 +79,8 @@ ingress SSO.
 | `PAPERLESS_TOKEN` | — | API token of the paperless account documents are uploaded as. Needs add/view/delete document, add note and view custom field. |
 | `LLM_URL` | — | OpenAI-compatible API with image input (e.g. llama.cpp), used to group photos and to read booking messages. Unset: no grouping, and no reservas handler. |
 | `LLM_MODEL` | — | Model name, exactly as the server lists it |
-| `SUPERLOGICA_URL` | `https://kpgadministrado.superlogica.net` | Condo site |
-| `SUPERLOGICA_CONDO_ID` / `SUPERLOGICA_UNIT_ID` | `58` / `6471` | Condo and apartment on the site |
+| `SUPERLOGICA_URL` | — | Condo site, `https://<condo>.superlogica.net` (required) |
+| `SUPERLOGICA_CONDO_ID` / `SUPERLOGICA_UNIT_ID` | — | Condo and apartment on the site (required) |
 | `SUPERLOGICA_LOGIN_URL` | — | Login service that returns a session. Unset: paste sessions in the dashboard. |
 | `NOTIFY_TOKEN` | — | Bearer token coruja sends to `POST /notify`. Unset: the endpoint refuses everything. |
 

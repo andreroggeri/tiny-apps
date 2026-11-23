@@ -2,7 +2,7 @@
 // service, or the one pombo saved) is logged in, and can make a test booking
 // and cancel it right away.
 //
-//	go run ./cmd/superlogica-check -session cookies.json
+//	go run ./cmd/superlogica-check -base https://... -condo .. -unit .. -session cookies.json
 //	go run ./cmd/superlogica-check -login-url http://localhost:8000/login
 //	go run ./cmd/superlogica-check -session cookies.json -book 788 -date 2026-12-20
 //	go run ./cmd/superlogica-check -login-url ... -book 788 -date 2026-12-20 -keep
@@ -20,9 +20,9 @@ import (
 )
 
 func main() {
-	base := flag.String("base", "https://kpgadministrado.superlogica.net", "condo site")
-	condo := flag.String("condo", "58", "condo ID")
-	unit := flag.String("unit", "6471", "unit ID")
+	base := flag.String("base", "", "condo site, e.g. https://your-condo.superlogica.net")
+	condo := flag.String("condo", "", "condo ID")
+	unit := flag.String("unit", "", "unit ID")
 	session := flag.String("session", "", "JSON cookie list to check")
 	loginURL := flag.String("login-url", "", "login service to get a session from instead (POST)")
 	area := flag.String("book", "", "area ID to book and then cancel, to test booking")
@@ -36,6 +36,9 @@ func main() {
 }
 
 func run(base, condo, unit, sessionPath, loginURL, area, date string, keep bool) error {
+	if base == "" || condo == "" || unit == "" {
+		return fmt.Errorf("-base, -condo and -unit are required")
+	}
 	ctx := context.Background()
 	c, err := superlogica.New(base, condo, unit, "")
 	if err != nil {

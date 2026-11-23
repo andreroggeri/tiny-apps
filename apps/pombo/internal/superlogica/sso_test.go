@@ -82,7 +82,7 @@ func (f *fakeSite) login(t *testing.T, cookies []Cookie) (*Client, *SSOLogin) {
 			t.Fatal(err)
 		}
 	}
-	c, err := New(f.condoURL, "58", "6471", path)
+	c, err := New(f.condoURL, "1", "2", path)
 	if err != nil {
 		t.Fatal(err)
 	}
