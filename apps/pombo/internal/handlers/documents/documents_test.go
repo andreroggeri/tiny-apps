@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/crop"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/grouping"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/router"
 )
@@ -87,6 +88,13 @@ type chat struct {
 	mu        sync.Mutex
 	reactions map[string][]string
 	replies   []string
+	images    []imageReply
+	imageErr  error // returned by every image reply
+}
+
+type imageReply struct {
+	msgID, mime, caption string
+	data                 []byte
 }
 
 func (c *chat) msg(id, text string, media *router.Media) router.Message {
@@ -106,6 +114,12 @@ func (c *chat) msg(id, text string, media *router.Media) router.Message {
 			}
 			c.reactions[id] = append(c.reactions[id], e)
 			return nil
+		},
+		ReplyImageFunc: func(_ context.Context, data []byte, mime, caption string) error {
+			c.mu.Lock()
+			defer c.mu.Unlock()
+			c.images = append(c.images, imageReply{msgID: id, mime: mime, caption: caption, data: data})
+			return c.imageErr
 		},
 	}
 }
@@ -410,5 +424,93 @@ func TestUploadFailureReactsAndExplains(t *testing.T) {
 	}
 	if len(c.replies) != 1 || !strings.Contains(c.replies[0], "paperless is down") {
 		t.Errorf("replies = %q", c.replies)
+	}
+}
+
+// fakeCropper replaces a photo with "page", or fails with err.
+type fakeCropper struct {
+	err   error
+	calls int
+}
+
+func (f *fakeCropper) Crop(context.Context, []byte, string) ([]byte, error) {
+	f.calls++
+	if f.err != nil {
+		return nil, f.err
+	}
+	return []byte("page"), nil
+}
+
+func TestPhotosAreCroppedOnArrival(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want string // what's uploaded: "page", or the original photo
+	}{
+		{"cropped", nil, "page"},
+		{"no page", crop.ErrNoPage, "original"},
+		{"tesourinha down", errors.New("connection refused"), "original"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p, c := &fakePaperless{}, &chat{}
+			h := newHandler(p, &fakeGrouper{})
+			h.Cropper = &fakeCropper{err: tc.err}
+			photo := jpegPhoto(t)
+			original, _ := photo.Download(context.Background())
+			if err := h.Handle(context.Background(), c.msg("1", "", photo)); err != nil {
+				t.Fatal(err)
+			}
+			h.Wait()
+
+			if len(p.uploads) != 1 || c.last("1") != reactDone {
+				t.Fatalf("uploads %d, reactions %q", len(p.uploads), c.reactions["1"])
+			}
+			got := p.uploads[0].data
+			if (tc.want == "page") != bytes.Equal(got, []byte("page")) || (tc.want == "original") != bytes.Equal(got, original) {
+				t.Fatalf("uploaded %d bytes, want the %s", len(got), tc.want)
+			}
+
+			// Only a real crop is shown back in the group, quoting the photo.
+			if tc.want != "page" {
+				if len(c.images) != 0 {
+					t.Fatalf("sent %d crop previews, want none", len(c.images))
+				}
+				return
+			}
+			if len(c.images) != 1 {
+				t.Fatalf("sent %d crop previews, want 1", len(c.images))
+			}
+			img := c.images[0]
+			if img.msgID != "1" || string(img.data) != "page" || img.mime != "image/jpeg" || img.caption != cropCaption {
+				t.Errorf("preview = %+v", img)
+			}
+		})
+	}
+}
+
+func TestFilesAreNotCropped(t *testing.T) {
+	p, c := &fakePaperless{}, &chat{}
+	h := newHandler(p, &fakeGrouper{})
+	cr := &fakeCropper{}
+	h.Cropper = cr
+	media := jpegPhoto(t)
+	media.FileName = "scan.jpg" // sent as a file: kept exactly as sent
+	h.Handle(context.Background(), c.msg("1", "", media))
+	h.Wait()
+	if cr.calls != 0 || len(p.uploads) != 1 || len(c.images) != 0 {
+		t.Fatalf("crop calls %d, uploads %d, previews %d", cr.calls, len(p.uploads), len(c.images))
+	}
+}
+
+func TestCropPreviewFailureStillFiles(t *testing.T) {
+	p, c := &fakePaperless{}, &chat{imageErr: errors.New("upload failed")}
+	h := newHandler(p, &fakeGrouper{})
+	h.Cropper = &fakeCropper{}
+	if err := h.Handle(context.Background(), c.msg("1", "", jpegPhoto(t))); err != nil {
+		t.Fatal(err)
+	}
+	h.Wait()
+	if len(p.uploads) != 1 || !bytes.Equal(p.uploads[0].data, []byte("page")) || c.last("1") != reactDone {
+		t.Fatalf("uploads %d, reactions %q", len(p.uploads), c.reactions["1"])
 	}
 }

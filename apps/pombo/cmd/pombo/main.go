@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/crop"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/dash"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/grouping"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/handlers/documents"
@@ -40,6 +41,7 @@ type config struct {
 	LLMURL         string // OpenAI-compatible API with image input; "" disables grouping
 	LLMModel       string
 	NotifyToken    string // bearer token coruja sends to /notify; "" disables it
+	CropURL        string // tesourinha, which crops photos to the page; "" files them as sent
 
 	// Condo bookings (reservas handler).
 	SuperlogicaURL      string
@@ -57,6 +59,7 @@ func loadConfig() (config, error) {
 		LLMURL:         os.Getenv("LLM_URL"),
 		LLMModel:       os.Getenv("LLM_MODEL"),
 		NotifyToken:    os.Getenv("NOTIFY_TOKEN"),
+		CropURL:        os.Getenv("CROP_URL"),
 
 		SuperlogicaURL:      os.Getenv("SUPERLOGICA_URL"),
 		SuperlogicaCondoID:  os.Getenv("SUPERLOGICA_CONDO_ID"),
@@ -118,6 +121,11 @@ func run(log *slog.Logger) error {
 		log.Warn("LLM_URL not set: photos sent together are filed as separate documents")
 	}
 	docs := documents.New(pl, grouper, log)
+	if cfg.CropURL != "" {
+		docs.Cropper = crop.New(cfg.CropURL)
+	} else {
+		log.Warn("CROP_URL not set: photos are filed with their background")
+	}
 	if docs.SentByField, err = pl.CustomFieldID(ctx, sentByField); err != nil {
 		log.Warn("not recording who sent documents", "err", err)
 	}

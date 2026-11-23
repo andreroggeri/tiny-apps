@@ -20,6 +20,8 @@ type Message struct {
 
 	ReplyFunc func(ctx context.Context, text string) error
 	ReactFunc func(ctx context.Context, emoji string) error
+	// ReplyImageFunc sends an image quoting the message.
+	ReplyImageFunc func(ctx context.Context, data []byte, mimeType, caption string) error
 }
 
 func (m Message) Reply(ctx context.Context, text string) error {
@@ -35,6 +37,14 @@ func (m Message) React(ctx context.Context, emoji string) error {
 		return nil
 	}
 	return m.ReactFunc(ctx, emoji)
+}
+
+// ReplyImage sends an image as a reply quoting the message.
+func (m Message) ReplyImage(ctx context.Context, data []byte, mimeType, caption string) error {
+	if m.ReplyImageFunc == nil {
+		return nil
+	}
+	return m.ReplyImageFunc(ctx, data, mimeType, caption)
 }
 
 // Media is an attachment. Download is lazy so ignored messages cost nothing.

@@ -2,6 +2,7 @@
 
 Newest first. One line per deployed version: what changed and why.
 
+- 2026-11-23: photos are cropped to the page by tesourinha before filing, because they landed in paperless with the couch around the page; pombo replies with each crop so a bad one is seen right away.
 - 2026-11-22: `reservas` handler books the manicure chair from WhatsApp, including dates not open yet, because the slots run out the moment a date opens. Login is left to a separate service because the site's login is behind reCAPTCHA.
 - 2026-10-24: records the sender in `Enviado por` and posts coruja's summaries in the group, so every new document (not only WhatsApp ones) is announced.
 - 2026-10-24: moved into the tiny-apps repo (image `ghcr.io/andreroggeri/tiny-apps/pombo`), to keep the small home apps in one place.

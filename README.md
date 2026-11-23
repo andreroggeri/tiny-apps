@@ -15,6 +15,7 @@ survive load, and none of it is built for anyone else.
 | --- | --- | --- | --- |
 | [pombo](apps/pombo) | WhatsApp bot for the family groups. Files photos and PDFs sent to the documents group in paperless, grouped into documents by a vision LLM. | Go + SQLite | running |
 | [coruja](apps/coruja) | Summarizes every new paperless document (title + one line) and asks pombo to announce it. Called by a paperless workflow webhook. | Go | new |
+| [tesourinha](apps/tesourinha) | Crops photos of documents to the page and straightens them, before pombo files them. | Python + OpenCV | new |
 
 ## Conventions
 

@@ -188,6 +188,14 @@ func (c *Client) handleMessage(e *events.Message) {
 			_, err := c.cli.SendMessage(ctx, e.Info.Chat, c.cli.BuildReaction(e.Info.Chat, e.Info.Sender, e.Info.ID, emoji))
 			return err
 		},
+		ReplyImageFunc: func(ctx context.Context, data []byte, mimeType, caption string) error {
+			up, err := c.cli.Upload(ctx, data, whatsmeow.MediaImage)
+			if err != nil {
+				return fmt.Errorf("upload image: %w", err)
+			}
+			_, err = c.cli.SendMessage(ctx, e.Info.Chat, imageReplyTo(e, up, mimeType, caption))
+			return err
+		},
 	}
 	c.onMessage(ctx, m)
 }
@@ -244,12 +252,33 @@ func (c *Client) media(m *waE2E.Message) *router.Media {
 func replyTo(e *events.Message, text string) *waE2E.Message {
 	return &waE2E.Message{
 		ExtendedTextMessage: &waE2E.ExtendedTextMessage{
-			Text: proto.String(text),
-			ContextInfo: &waE2E.ContextInfo{
-				StanzaID:      proto.String(e.Info.ID),
-				Participant:   proto.String(e.Info.Sender.ToNonAD().String()),
-				QuotedMessage: e.Message,
-			},
+			Text:        proto.String(text),
+			ContextInfo: quote(e),
 		},
+	}
+}
+
+// imageReplyTo builds an image message, already uploaded, quoting the original.
+func imageReplyTo(e *events.Message, up whatsmeow.UploadResponse, mimeType, caption string) *waE2E.Message {
+	return &waE2E.Message{
+		ImageMessage: &waE2E.ImageMessage{
+			Caption:       proto.String(caption),
+			Mimetype:      proto.String(mimeType),
+			URL:           proto.String(up.URL),
+			DirectPath:    proto.String(up.DirectPath),
+			MediaKey:      up.MediaKey,
+			FileEncSHA256: up.FileEncSHA256,
+			FileSHA256:    up.FileSHA256,
+			FileLength:    proto.Uint64(up.FileLength),
+			ContextInfo:   quote(e),
+		},
+	}
+}
+
+func quote(e *events.Message) *waE2E.ContextInfo {
+	return &waE2E.ContextInfo{
+		StanzaID:      proto.String(e.Info.ID),
+		Participant:   proto.String(e.Info.Sender.ToNonAD().String()),
+		QuotedMessage: e.Message,
 	}
 }
