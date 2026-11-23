@@ -5,6 +5,7 @@
 //	go run ./cmd/superlogica-check -session cookies.json
 //	go run ./cmd/superlogica-check -login-url http://localhost:8000/login
 //	go run ./cmd/superlogica-check -session cookies.json -book 788 -date 2026-12-20
+//	go run ./cmd/superlogica-check -login-url ... -book 788 -date 2026-12-20 -keep
 package main
 
 import (
@@ -26,14 +27,15 @@ func main() {
 	loginURL := flag.String("login-url", "", "login service to get a session from instead (POST)")
 	area := flag.String("book", "", "area ID to book and then cancel, to test booking")
 	date := flag.String("date", "", "date for -book, YYYY-MM-DD")
+	keep := flag.Bool("keep", false, "with -book, leave the booking in place instead of cancelling it")
 	flag.Parse()
-	if err := run(*base, *condo, *unit, *session, *loginURL, *area, *date); err != nil {
+	if err := run(*base, *condo, *unit, *session, *loginURL, *area, *date, *keep); err != nil {
 		fmt.Fprintln(os.Stderr, "FAIL:", err)
 		os.Exit(1)
 	}
 }
 
-func run(base, condo, unit, sessionPath, loginURL, area, date string) error {
+func run(base, condo, unit, sessionPath, loginURL, area, date string, keep bool) error {
 	ctx := context.Background()
 	c, err := superlogica.New(base, condo, unit, "")
 	if err != nil {
@@ -79,6 +81,10 @@ func run(base, condo, unit, sessionPath, loginURL, area, date string) error {
 	}
 	if r.Outcome != superlogica.Booked {
 		return fmt.Errorf("not booked: %s", r.Msg)
+	}
+	if keep {
+		fmt.Printf("OK: booked (reservation %s, queue %s); left in place, cancel it on the site\n", r.ID, r.Queue)
+		return nil
 	}
 	fmt.Printf("OK: booked (reservation %s, queue %s); cancelling\n", r.ID, r.Queue)
 	if err := c.Cancel(ctx, r.ID, day, "Teste do pombo"); err != nil {

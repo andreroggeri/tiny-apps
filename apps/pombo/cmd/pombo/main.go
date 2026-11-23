@@ -45,7 +45,7 @@ type config struct {
 	SuperlogicaURL      string
 	SuperlogicaCondoID  string
 	SuperlogicaUnitID   string
-	SuperlogicaLoginURL string // login service; "" = sessions are pasted in the dashboard
+	SuperlogicaLoginURL string // external login service; "" = renew in-process through the SSO session
 }
 
 func loadConfig() (config, error) {
@@ -121,11 +121,17 @@ func run(log *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	var login superlogica.Login = superlogica.NoLogin{}
+	// Renewing needs no browser and no separate service: the saved session
+	// carries the Keycloak cookies, which mint a new app session on their
+	// own. SUPERLOGICA_LOGIN_URL is left as an escape hatch for the day the
+	// login form has to be driven after all.
+	var login superlogica.Login = superlogica.NewSSOLogin(condo)
 	if cfg.SuperlogicaLoginURL != "" {
 		login = superlogica.NewHTTPLogin(cfg.SuperlogicaLoginURL)
-	} else {
-		log.Warn("SUPERLOGICA_LOGIN_URL not set: condo sessions must be pasted in the dashboard")
+		log.Info("renewing condo sessions through an external login service", "url", cfg.SuperlogicaLoginURL)
+	}
+	if !condo.HasSession() {
+		log.Warn("no condo session saved yet: paste one in the dashboard, cookies for both superlogica hosts")
 	}
 	site := superlogica.NewSite(condo, login, log)
 	saoPaulo, err := time.LoadLocation("America/Sao_Paulo")

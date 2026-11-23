@@ -153,6 +153,13 @@ func (c *Client) SetSession(cookies []Cookie) error {
 	return os.Rename(tmp, c.sessionPath)
 }
 
+// Session returns the cookies the client is using, app and Keycloak alike.
+func (c *Client) Session() []Cookie {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]Cookie(nil), c.cookies...)
+}
+
 // HasSession reports whether any session cookies are loaded.
 func (c *Client) HasSession() bool {
 	c.mu.Lock()
