@@ -200,6 +200,14 @@ func (s *Server) setCondoSession(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not a JSON cookie list: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	// Without the Keycloak cookies this session works until it expires and
+	// then cannot renew, which looks fine for days and then stops. Easier to
+	// refuse the paste than to debug that later.
+	if len(superlogica.CookiesForHost(cookies, superlogica.DefaultSSOHost)) == 0 {
+		http.Error(w, "no "+superlogica.DefaultSSOHost+" cookies in this session: export both domains, "+
+			"or pombo won't be able to renew it when it expires", http.StatusBadRequest)
+		return
+	}
 	s.saveAndRedirect(w, r, s.condo.SetSession(cookies))
 }
 
