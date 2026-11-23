@@ -17,7 +17,7 @@ own AI to finish with it, then:
 
    > 📄 *CNH do André*
    > Carteira de motorista, categoria AB, válida até 2031.
-   > Enviado por Luana · https://docs.local.roggeri.com.br/documents/8/details
+   > Enviado por Fulana · https://docs.example.com/documents/8/details
 
 A document that already has a `Resumo` is skipped, so a repeated webhook is
 harmless.

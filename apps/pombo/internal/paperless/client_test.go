@@ -29,7 +29,7 @@ func fakePaperless(t *testing.T, taskStatus string) *httptest.Server {
 			return
 		}
 		data, _ := io.ReadAll(f)
-		if hdr.Filename != "conta.pdf" || string(data) != "%PDF" || r.FormValue("custom_fields") != `{"4":"Luana"}` {
+		if hdr.Filename != "conta.pdf" || string(data) != "%PDF" || r.FormValue("custom_fields") != `{"4":"Fulana"}` {
 			http.Error(w, "unexpected upload", http.StatusBadRequest)
 			return
 		}
@@ -78,7 +78,7 @@ func TestUploadWaitAndNote(t *testing.T) {
 	c := newTestClient(fakePaperless(t, "success").URL)
 	ctx := context.Background()
 
-	taskID, err := c.Upload(ctx, "conta.pdf", []byte("%PDF"), map[int]string{4: "Luana"})
+	taskID, err := c.Upload(ctx, "conta.pdf", []byte("%PDF"), map[int]string{4: "Fulana"})
 	if err != nil || taskID != "task-123" {
 		t.Fatalf("Upload = %q, %v", taskID, err)
 	}

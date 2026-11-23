@@ -81,7 +81,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 //
 //	📄 *CNH do André*
 //	Carteira de motorista, categoria AB, válida até 2031.
-//	Enviado por Luana · https://docs.example/documents/8/details
+//	Enviado por Fulana · https://docs.example/documents/8/details
 func Text(doc Document) string {
 	lines := []string{"📄 *" + doc.Title + "*"}
 	if doc.Summary != "" {

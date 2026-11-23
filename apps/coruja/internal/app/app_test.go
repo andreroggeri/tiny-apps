@@ -72,7 +72,7 @@ func cnh() paperless.Document {
 	return paperless.Document{
 		ID: 8, Title: "whatsapp-20261024-133000", OriginalFileName: "whatsapp-20261024-133000.jpg",
 		MimeType: "image/jpeg", Content: "HABILITAÇÃO", Tags: []int{1, 2}, DocumentType: &five,
-		CustomFields: []paperless.FieldValue{{Field: sentByField, Value: "Luana"}},
+		CustomFields: []paperless.FieldValue{{Field: sentByField, Value: "Fulana"}},
 	}
 }
 
@@ -90,7 +90,7 @@ func TestProcessSummarizesSharesAndNotifies(t *testing.T) {
 	want := map[string]any{
 		"title": "CNH do André",
 		"custom_fields": []paperless.FieldValue{
-			{Field: sentByField, Value: "Luana"},
+			{Field: sentByField, Value: "Fulana"},
 			{Field: summaryField, Value: "Carteira de motorista, categoria AB, válida até 2031."},
 		},
 	}
@@ -102,7 +102,7 @@ func TestProcessSummarizesSharesAndNotifies(t *testing.T) {
 	}
 	wantN := Notification{
 		DocumentID: 8, Title: "CNH do André", Summary: "Carteira de motorista, categoria AB, válida até 2031.",
-		SentBy: "Luana", URL: "https://docs.example/documents/8/details",
+		SentBy: "Fulana", URL: "https://docs.example/documents/8/details",
 	}
 	if len(n.got) != 1 || n.got[0] != wantN {
 		t.Errorf("notifications = %+v", n.got)

@@ -22,7 +22,7 @@ func (f fakeSettings) AllowedSender(_ context.Context, phone string) (string, bo
 	if !f.allowed[phone] {
 		return "", false, nil
 	}
-	return "Luana", true, nil
+	return "Fulana", true, nil
 }
 
 type recordingHandler struct {
@@ -62,7 +62,7 @@ func TestDispatch(t *testing.T) {
 			if got := len(h.got) == 1; got != tt.called {
 				t.Fatalf("handler called = %v, want %v", got, tt.called)
 			}
-			if tt.called && h.got[0].SenderName != "Luana" {
+			if tt.called && h.got[0].SenderName != "Fulana" {
 				t.Errorf("SenderName = %q, want the allowlist name", h.got[0].SenderName)
 			}
 		})
