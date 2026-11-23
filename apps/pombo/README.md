@@ -17,6 +17,12 @@ number you can afford to lose, never a personal one.
 - **Reactions show progress:** ⏳ when a photo arrives, ✅ once paperless has
   filed it, ❌ (plus a reply saying why) if it fails. A text message that's
   picked up as context gets 📝.
+- **Photos are cropped:** each photo is cut to the page and straightened by
+  [tesourinha](../tesourinha) as it arrives, so paperless gets the page, not
+  the table around it. Pombo replies to each cropped photo with the crop
+  ("✂️ recorte"), so a bad one is spotted right away. If it finds no page or
+  is down, the photo is kept as sent, with no reply. Files (photos sent as
+  documents, PDFs) are never cropped.
 - **Photos are batched:** photos from the same person arriving within 30 s of
   each other are held, then a vision LLM groups them into documents, so a
   contract photographed page by page becomes one multi-page PDF. Without an
@@ -77,6 +83,7 @@ ingress SSO.
 | `POMBO_LISTEN` | `:8080` | Dashboard address |
 | `PAPERLESS_URL` | — | API base the bot calls, e.g. `http://paperless.paperless.svc:8000` |
 | `PAPERLESS_TOKEN` | — | API token of the paperless account documents are uploaded as. Needs add/view/delete document, add note and view custom field. |
+| `CROP_URL` | — | tesourinha, e.g. `http://localhost:8081` (a container in the same pod). Unset: photos are filed as sent. |
 | `LLM_URL` | — | OpenAI-compatible API with image input (e.g. llama.cpp), used to group photos and to read booking messages. Unset: no grouping, and no reservas handler. |
 | `LLM_MODEL` | — | Model name, exactly as the server lists it |
 | `SUPERLOGICA_URL` | — | Condo site, `https://<condo>.superlogica.net` (required) |

@@ -11,6 +11,7 @@ package documents
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"mime"
@@ -19,6 +20,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/crop"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/grouping"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/pdf"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/router"
@@ -40,6 +42,12 @@ type Paperless interface {
 	AddNote(ctx context.Context, id int, note string) error
 	Content(ctx context.Context, id int) (string, error)
 	Delete(ctx context.Context, id int) error
+}
+
+// Cropper cuts a photographed page out of its background. It returns
+// crop.ErrNoPage, or any error, to keep the photo as it is.
+type Cropper interface {
+	Crop(ctx context.Context, image []byte, mimeType string) ([]byte, error)
 }
 
 type Grouper interface {
@@ -107,6 +115,10 @@ type Handler struct {
 	grouper   Grouper // nil: every photo becomes its own document
 	log       *slog.Logger
 
+	// Cropper, if set, crops each photo as it arrives, so grouping, late
+	// pages and paperless all see the page without the background.
+	Cropper Cropper
+
 	// BatchWindow is how long to wait after the last photo or text before
 	// filing the batch. MergeWindow is how long a filed document stays open
 	// to more pages, and TextWindow how long a text sent with no photo waits
@@ -162,8 +174,33 @@ func (h *Handler) Handle(ctx context.Context, m router.Message) error {
 	if err != nil {
 		return fmt.Errorf("baixar o arquivo do WhatsApp: %w", err)
 	}
-	h.add(key, item{msg: m, data: data, mime: m.Media.MimeType, name: m.Media.FileName, text: text})
+	it := item{msg: m, data: data, mime: m.Media.MimeType, name: m.Media.FileName, text: text}
+	if h.Cropper != nil && it.isPhoto() {
+		it = h.crop(ctx, it)
+	}
+	h.add(key, it)
 	return m.React(ctx, reactWorking)
+}
+
+const cropCaption = "✂️ recorte"
+
+// crop returns the photo cropped to the page, or unchanged if there's no
+// page to crop or cropping fails: a photo with background beats no photo.
+func (h *Handler) crop(ctx context.Context, it item) item {
+	page, err := h.Cropper.Crop(ctx, it.data, it.mime)
+	switch {
+	case errors.Is(err, crop.ErrNoPage):
+		return it
+	case err != nil:
+		h.log.Warn("could not crop the photo, keeping it as is", "err", err)
+		return it
+	}
+	it.data, it.mime = page, "image/jpeg"
+	// Show the crop in the group, so a bad one is spotted right away.
+	if err := it.msg.ReplyImage(ctx, page, it.mime, cropCaption); err != nil {
+		h.log.Warn("could not send the crop preview", "err", err)
+	}
+	return it
 }
 
 func (h *Handler) add(key batchKey, it item) {
