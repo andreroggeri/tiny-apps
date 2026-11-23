@@ -5,79 +5,102 @@ State as of 2026-11-22. Branch `feat/pombo-reservas`, PR andreroggeri/tiny-apps#
 ## Goal
 
 Pombo books the condo's manicure chair from WhatsApp. It needs a logged-in
-session on the condo site. When the session expires, pombo calls a login
-service to get a new one. **That login is the only missing piece.**
+session on the condo site, and renews that session itself when it expires.
 
-## What already works
+**The login works and is verified against the real site.** What's left is the
+deploy.
+
+## What works
 
 | Piece | Where | State |
 |---|---|---|
 | Booking handler (`reservas`) | `internal/handlers/reservas` | Done, tested. Uses the local LLM to read messages. |
-| Site client (book, cancel, keep-alive) | `internal/superlogica` | Done, tested against fakes; not yet against the real site. |
-| Session paste in dashboard | `internal/dash` ("Condomínio" box) | Done. Manual fallback. |
-| Login service HTTP server | `cmd/superlogica-login` | Done. Answers `POST /login`. |
-| Reading the emailed code | `waitForCode` in `cmd/superlogica-login` | Done, tested. |
-| Code mailbox | `otp-superlogica@roggeri.com.br` → Cloudflare Worker → `https://otp.roggeri.com.br/codes/superlogica` | Live. Gmail forwarding confirmed. Code in `infrastructure/pulumi/homelab/otp-relay`. |
-| Gmail filter for Superlogica code emails | Gmail | Done. |
-| **`login()`** | `cmd/superlogica-login/main.go` | **TODO** |
+| Site client (book, cancel, keep-alive) | `internal/superlogica` | Done. Verified against the real site. |
+| Session paste in dashboard | `internal/dash` ("Condomínio" box) | Done. Now also how a session is seeded; refuses a paste missing the Keycloak cookies. |
+| **Session renewal (`SSOLogin`)** | `internal/superlogica/sso.go` | **Done, tested. Runs inside pombo — no sidecar, no browser.** |
+| Hand tool / HTTP wrapper | `cmd/superlogica-login` | Done. Not deployed; for seeding and local checks. |
+| Checking tool | `cmd/superlogica-check` | Done. `-keep` leaves a test booking in place. |
+| otp-relay Worker + Gmail filter | infrastructure repo | Live, but **no longer used**. See [OTP-RELAY.md](OTP-RELAY.md). |
 
-## The login flow
+## How renewal works
 
-1. Pombo's keep-alive (every 5 min) or a booking finds the session dead.
-2. Pombo sends `POST http://localhost:8000/login` (`SUPERLOGICA_LOGIN_URL`).
-3. `login()` opens a browser at
-   `https://kpgadministrado.superlogica.net/clients/areadocondomino`, which
-   redirects to `sso.superlogica.com` (Keycloak, realm `superlogica-cloud`).
-4. Note the time, type `SUPERLOGICA_EMAIL`, continue. The site emails a code.
-5. Gmail forwards the email to the Worker. `waitForCode(ctx, cfg, askedAt)`
-   polls it and returns the code (about 2 s between polls, 3 min timeout).
-6. Type the code. Wait until the page is back on
-   `kpgadministrado.superlogica.net/clients/areadocondomino/...`.
-7. Return all browser cookies (both domains) as `[]superlogica.Cookie`
-   (`name`, `value`, `domain`, `path`). The server sends them to pombo as JSON.
-8. Pombo saves them (`/data/superlogica-session.json`) and continues.
+The login form is behind reCAPTCHA Enterprise, so it is never submitted. The
+site keeps two sessions and only the short one expires:
 
-Must finish within 5 minutes (pombo's timeout). On failure, return an error;
-the server answers 500 with the message and pombo tells the group.
+| Session | Host | Lives |
+|---|---|---|
+| `PHPSESSID` | `kpgadministrado.superlogica.net` | short |
+| Keycloak SSO | `sso.superlogica.com` | much longer |
 
-## Run and check it locally
+Opening the condo site with the Keycloak cookies attached makes the OIDC
+authorize endpoint redirect straight back to the callback and mint a new app
+session — no form, no reCAPTCHA, no emailed code. Plain `net/http`.
 
-```sh
-cd apps/pombo
-# token: in the infrastructure repo, pulumi/:  pulumi stack output otpRelayToken --show-secrets
-SUPERLOGICA_EMAIL=a.roggeri.c@gmail.com OTP_RELAY_TOKEN=... go run ./cmd/superlogica-login
-```
+A renewal returns the cookies for both hosts and pombo saves them all to
+`/data/superlogica-session.json`, so that one file keeps the next renewal
+possible. Details in [README.md](README.md).
 
-In another terminal:
+This replaced the original plan (a sidecar driving a real browser through the
+email + code flow). That needed a browser in the cluster — the storage problem
+these notes used to flag — and a stealth browser to beat the reCAPTCHA score,
+which isn't a road worth taking for a condo booking bot.
 
-```sh
-go run ./cmd/superlogica-check -login-url http://localhost:8000/login
-# expect: OK: session is logged in
+## Verified on the real site (2026-11-22)
 
-# real booking test: books slot 788 (06–08h) and cancels it right away.
-# use an open date: tomorrow up to 30 days ahead.
-go run ./cmd/superlogica-check -login-url http://localhost:8000/login -book 788 -date YYYY-MM-DD
-```
+- Keycloak answered an authorize request carrying the SSO cookies and
+  `prompt=none` with a `code=`, not `error=login_required`: the realm does do
+  silent re-auth.
+- `superlogica-check` against the renewal: `OK: session is logged in`, 14
+  cookies in 3 s.
+- A real booking went through: slot 788 (06–08h) on 2026-11-25, reservation
+  `30150`, queue 1, confirmed in the portal and left for André to cancel.
+- The saved session after a renewal holds 3 condo cookies and 11 Keycloak
+  ones, so it is self-sustaining.
 
-Unit tests: `make lint test`.
-
-## Deploy (after login() works)
+## Deploy
 
 1. Merge PR #1. CI publishes `ghcr.io/andreroggeri/tiny-apps/pombo:sha-<commit>`.
-2. Build an image for the login service (the Go binary plus the browser it
-   drives). Pombo's Dockerfile only builds `cmd/pombo`; the login service
-   needs its own.
-3. In the infrastructure repo:
-   - Add the login service as a sidecar in `k3s/charts/pombo/templates/deployment.yaml`,
-     with `SUPERLOGICA_EMAIL` and `OTP_RELAY_TOKEN` from a sealed secret
-     (`utils/seal-secret.sh`).
-   - In `k3s/applications/pombo/values.yaml`: bump `image.tag`, set
-     `superlogica.loginUrl: http://localhost:8000/login`.
-   - `cd k3s && helmfile -l name=pombo --skip-deps sync`
-4. In pombo's dashboard, route the family group to `reservas`.
-5. Add a line to `apps/pombo/DECISIONS.md` for the deploy.
+2. In the infrastructure repo, `k3s/applications/pombo/values.yaml`: bump
+   `image.tag`. Nothing else — no sidecar, no second image, no extra volume,
+   no `SUPERLOGICA_LOGIN_URL`.
+3. `cd k3s && helmfile -l name=pombo --skip-deps sync`
+4. Seed the session: log in by hand and paste the cookies for **both** hosts
+   into the dashboard's "Condomínio" box. A paste without the
+   `sso.superlogica.com` cookies is refused, so this is hard to get wrong now.
+5. Route the family group to `reservas` in the dashboard.
+6. Add a line to `apps/pombo/DECISIONS.md`.
 
-Storage is tight on the cluster. The browser is most of the sidecar's size.
+## The idle-timeout risk, and why it's the opposite of what it looks like
+
+Keycloak's SSO session has its own idle timeout. The trap: **pombo's
+keep-alive does not touch it.** `Alive()` fetches
+`/clients/areadocondomino/reservas` on the *condo* host, refreshing
+`PHPSESSID` only. `sso.superlogica.com` is reached solely when a renewal
+runs.
+
+So the failure mode shows up when everything is working, not when pombo is
+down: a healthy keep-alive means the app session never dies, which means no
+renewal ever runs, which means the Keycloak session sits untouched until it
+idles out. The first time a renewal is actually needed, it fails.
+
+Fix, if the first weeks show this: touch the SSO session on a timer. An
+authorize request with `prompt=none` resets Keycloak's idle clock, costs one
+round trip and mints no app session. It needs no valid PKCE verifier, since
+the returned code is thrown away.
+
+## Things nobody knows yet
+
+- **How long the Keycloak SSO session lasts, idle.** The number that matters:
+  it decides whether the timer fix above is needed and how often a hand
+  re-seed is. Keycloak's own defaults are short (30 min idle, 10 h max), but
+  realms with "remember me" run far longer, and this one clearly does — the
+  session used on 2026-11-22 was days old and still re-authed silently.
+  Superlogica's realm config isn't visible from outside; only the logs will
+  tell.
+- How long an app session lasts. Pombo logs `superlogica session expired
+  lasted_at_least=...` each time; check after the first week.
+- Whether a booking at midnight gets the slot first; the first real run will
+  tell.
 
 ## Site facts
 
@@ -85,10 +108,6 @@ Storage is tight on the cluster. The browser is most of the sidecar's size.
 - Manicure chair: one area ID per 2-hour slot, 788 (06–08h) to 795 (20–22h).
 - Dates open 30 days ahead at 00:00 São Paulo time; earliest is tomorrow.
 - Booking and cancel requests: `internal/superlogica/client.go`.
-
-## Things nobody knows yet
-
-- How long a session lasts. Pombo logs `superlogica session expired
-  lasted_at_least=...` each time; check after the first week.
-- The exact sender of Superlogica's code emails (the Gmail filter matched it).
-- Whether a booking at midnight gets the slot first; the first real run will tell.
+- The login page runs reCAPTCHA Enterprise (site key in the page source) and
+  Datadog RUM, and posts `hidden_validation` with the reCAPTCHA token. The
+  page's own script notes that a submit without a token gets an error back.
