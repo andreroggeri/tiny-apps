@@ -4,3 +4,7 @@
 *.db-shm
 *.db-wal
 .DS_Store
+# live session cookies; never commit one
+superlogica-session.json
+superlogica-sso.json
+*.json.tmp

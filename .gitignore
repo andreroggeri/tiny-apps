@@ -20,3 +20,6 @@ data/
 .env.*
 !.env.example
 *.secret.yaml
+# browser "Copy as cURL" dumps: these carry live session cookies
+curl.txt
+*.curl.txt

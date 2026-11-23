@@ -91,7 +91,7 @@ type chat struct {
 
 func (c *chat) msg(id, text string, media *router.Media) router.Message {
 	return router.Message{
-		ChatJID: "docs@g.us", SenderPhone: "5511999998888", SenderName: "Luana", Text: text, Media: media,
+		ChatJID: "docs@g.us", SenderPhone: "5511999998888", SenderName: "Fulana", Text: text, Media: media,
 		ReplyFunc: func(_ context.Context, t string) error {
 			c.mu.Lock()
 			defer c.mu.Unlock()
@@ -157,7 +157,7 @@ func TestLonePhotoIsUploadedAsIs(t *testing.T) {
 	}
 	h.Wait()
 
-	if len(p.uploads) != 1 || p.uploads[0].name != "whatsapp-20261023-150405.jpg" || p.uploads[0].fields[4] != "Luana" {
+	if len(p.uploads) != 1 || p.uploads[0].name != "whatsapp-20261023-150405.jpg" || p.uploads[0].fields[4] != "Fulana" {
 		t.Fatalf("uploads = %+v", p.uploads)
 	}
 	if c.last("1") != reactDone || len(c.replies) != 0 {

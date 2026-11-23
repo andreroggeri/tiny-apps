@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/settings"
+	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/superlogica"
 	"github.com/andreroggeri/tiny-apps/apps/pombo/internal/whatsapp"
 )
 
@@ -86,5 +87,53 @@ func TestIndexShowsQRWhenNotPaired(t *testing.T) {
 	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
 	if !strings.Contains(rec.Body.String(), "data:image/png;base64,") {
 		t.Fatal("QR image not rendered")
+	}
+}
+
+type fakeCondo struct{ cookies []superlogica.Cookie }
+
+func (f *fakeCondo) Alive(context.Context) error { return nil }
+func (f *fakeCondo) SetSession(c []superlogica.Cookie) error {
+	f.cookies = c
+	return nil
+}
+
+func TestCondoSessionPasteNeedsBothDomains(t *testing.T) {
+	appOnly := `[{"name":"PHPSESSID","value":"x","domain":"your-condo.superlogica.net","path":"/"}]`
+	bothHosts := `[{"name":"PHPSESSID","value":"x","domain":"your-condo.superlogica.net","path":"/"},
+	               {"name":"KEYCLOAK_IDENTITY","value":"y","domain":"sso.superlogica.com","path":"/"}]`
+
+	for _, tc := range []struct {
+		name     string
+		cookies  string
+		wantCode int
+		wantSet  bool
+	}{
+		// An app-only paste renews nothing later, so it is refused up front.
+		{"app cookies only", appOnly, http.StatusBadRequest, false},
+		{"both domains", bothHosts, http.StatusSeeOther, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store, err := settings.Open(context.Background(), filepath.Join(t.TempDir(), "pombo.db"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { store.Close() })
+			condo := &fakeCondo{}
+			h := New(fakeWA{}, store, []string{"documents"},
+				slog.New(slog.NewTextHandler(io.Discard, nil))).WithSuperlogica(condo).Handler()
+
+			rec := post(t, h, "/superlogica/session", url.Values{"cookies": {tc.cookies}})
+
+			if rec.Code != tc.wantCode {
+				t.Errorf("got HTTP %d, want %d (%s)", rec.Code, tc.wantCode, strings.TrimSpace(rec.Body.String()))
+			}
+			if got := len(condo.cookies) > 0; got != tc.wantSet {
+				t.Errorf("session saved = %v, want %v", got, tc.wantSet)
+			}
+			if tc.wantCode == http.StatusBadRequest && !strings.Contains(rec.Body.String(), "sso.superlogica.com") {
+				t.Errorf("the refusal should name the missing host: %q", rec.Body.String())
+			}
+		})
 	}
 }

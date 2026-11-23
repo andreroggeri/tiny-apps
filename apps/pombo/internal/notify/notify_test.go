@@ -28,7 +28,7 @@ func TestNotifySendsToDocumentsGroups(t *testing.T) {
 	routes := fakeRoutes{{GroupJID: "docs@g.us", Handler: "documents"}, {GroupJID: "family@g.us", Handler: ""}}
 	h := New(wa, routes, "secret", "documents", slog.New(slog.NewTextHandler(io.Discard, nil)))
 
-	body := `{"document_id":8,"title":"CNH do André","summary":"Categoria AB, válida até 2031.","sent_by":"Luana","url":"https://docs.example/documents/8/details"}`
+	body := `{"document_id":8,"title":"CNH do André","summary":"Categoria AB, válida até 2031.","sent_by":"Fulana","url":"https://docs.example/documents/8/details"}`
 	req := httptest.NewRequest(http.MethodPost, "/notify", strings.NewReader(body))
 	req.Header.Set("Authorization", "Bearer secret")
 	rec := httptest.NewRecorder()
@@ -37,7 +37,7 @@ func TestNotifySendsToDocumentsGroups(t *testing.T) {
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body)
 	}
-	want := "📄 *CNH do André*\nCategoria AB, válida até 2031.\nEnviado por Luana · https://docs.example/documents/8/details"
+	want := "📄 *CNH do André*\nCategoria AB, válida até 2031.\nEnviado por Fulana · https://docs.example/documents/8/details"
 	if len(wa.sent) != 1 || wa.sent["docs@g.us"] != want {
 		t.Fatalf("sent = %q", wa.sent)
 	}
